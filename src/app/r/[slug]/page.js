@@ -1,11 +1,31 @@
 import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { after, NextResponse } from 'next/server';
 import { getCardBySlug } from '@/lib/db';
-import { handleTapTelemetry } from '@/lib/logger';
+import { queueTapTelemetry } from '@/lib/logger';
+import { getClientMeta } from '@/lib/client-meta';
+import { resolveCardAction } from '@/lib/resolve-card-action';
 import RatingClientView from './RatingClientView';
 import FallbackView from './FallbackView';
 
+/** Allow request-time headers/DB access on this blocking NFC hot path (Next.js cacheComponents). */
 export const instant = false;
+
+/**
+ * Schedule debounced tap telemetry after the response is sent (non-blocking TTFB).
+ * @param {{ cardId: string, clientIp: string, userAgent: string }} meta
+ */
+function scheduleTapTelemetry(meta) {
+  const pending = queueTapTelemetry(meta);
+  if (!pending) return;
+
+  after(async () => {
+    try {
+      await pending;
+    } catch (err) {
+      console.error('[r/slug] Deferred tap telemetry failed:', err);
+    }
+  });
+}
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
@@ -27,40 +47,27 @@ export async function generateMetadata({ params }) {
 export default async function CardRoutePage({ params }) {
   const { slug } = await params;
 
-  // Retrieve incoming request headers for telemetry
   const headerList = await headers();
-  const userAgent = headerList.get('user-agent') || '';
-  const clientIp =
-    headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    headerList.get('x-real-ip') ||
-    '';
+  const { clientIp, userAgent } = getClientMeta(headerList);
 
-  // 1. Fetch card configuration by slug
   const card = await getCardBySlug(slug);
+  const action = resolveCardAction(card);
 
-  // 2. Fallback if card is missing / invalid
-  if (!card) {
+  if (action.type === 'fallback') {
     return <FallbackView slug={slug} />;
   }
 
-  // 3. Direct Mode (Subscription inactive): HTTP 307 instant redirect to Google Review
-  if (!card.is_shield_active) {
-    // Fire-and-forget telemetry without blocking redirect
-    handleTapTelemetry({
-      cardId: card.id,
-      clientIp,
-      userAgent,
-    });
-
-    redirect(card.google_review_url);
-  }
-
-  // 4. Shield Mode (Active): Fire-and-forget telemetry and render Rating UI
-  handleTapTelemetry({
-    cardId: card.id,
+  scheduleTapTelemetry({
+    cardId: action.type === 'shield_ui' ? action.card.id : card.id,
     clientIp,
     userAgent,
   });
 
-  return <RatingClientView card={card} />;
+  // Direct Mode: explicit HTTP 307 Temporary Redirect (no HTML shell)
+  if (action.type === 'direct_redirect') {
+    return NextResponse.redirect(action.url, action.status);
+  }
+
+  // Shield Mode: render rating UI (front-end owns the view)
+  return <RatingClientView card={action.card} />;
 }

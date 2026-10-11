@@ -1,180 +1,266 @@
-# QA Agent Verification & Testing Brief — NFC Public Web
+# QA Verification Plan — NFC Public Web
 
-**Role:** QA AI Agent  
-**Domain:** End-to-End Testing, Test Automation, Performance Benchmarking, Cross-Device Verification, Security & Boundary Testing  
-**Repository Context:** Next.js (App Router), Supabase / PostgreSQL  
-**Parent PRD References:**
-- [`01-overview.md`](file:///Users/tabaniii/Herd/filter-rating/01-overview.md)
-- [`02-user-persona-journey.md`](file:///Users/tabaniii/Herd/filter-rating/02-user-persona-journey.md)
-- [`03-feature-route-handler.md`](file:///Users/tabaniii/Herd/filter-rating/03-feature-route-handler.md)
-- [`04-feature-rating-ui.md`](file:///Users/tabaniii/Herd/filter-rating/04-feature-rating-ui.md)
-- [`05-database-schema.md`](file:///Users/tabaniii/Herd/filter-rating/05-database-schema.md)
-- [`06-non-functional-requirements.md`](file:///Users/tabaniii/Herd/filter-rating/06-non-functional-requirements.md)
+**Scope:** QA only. This plan verifies the Next.js App Router application and
+its Supabase/PostgreSQL contract. QA changes must stay in `tests/`, test
+configuration, and `briefs/qa/`; do not change application frontend/backend
+implementation while executing this plan.
 
----
+**Canonical document:** This file is the single source of truth. `brief.md`
+exists only as a compatibility pointer.
 
-## 1. Mission & Quality Objectives
+## 1. Quality objectives
 
-Guarantee that the **NFC Public Web (filter-rating)** operates with sub-second speeds, absolute reliability across smartphones, flawless redirect logic for high reviews, and zero data leakage for store reputation defense.
+| Area | Release threshold |
+|---|---|
+| High-rating routing | Ratings 4 and 5 navigate to the configured review URL; ratings 1–3 never do |
+| Direct mode | `GET /r/[slug]` returns HTTP 307 with the exact configured `Location`; no intermediate UI |
+| Feedback | Valid 1–3 ratings are persisted; invalid ratings and malformed payloads return 400 |
+| Telemetry | Tap logging is best-effort and never blocks the customer flow |
+| Debounce | Keyed by `card_id + normalized client IP + User-Agent`; duplicate events inside 5,000 ms are suppressed atomically |
+| Performance | Measure median and p95 separately for cold and warm requests; TTFB target `<300 ms`, interactive target `<1,000 ms` |
+| Mobile | No horizontal overflow at 360, 375, 390, 412, and 430 px; interactive targets are at least 48×48 px |
+| Accessibility | Keyboard and screen-reader labels/states work; Lighthouse mobile Accessibility target is ≥95 |
+| Security | No XSS execution, unsafe redirect, secret exposure, or unauthorized feedback/tap-log read access |
 
-### Core Quality Metrics:
-- **Redirection Accuracy:** 100% of 4–5 star taps route to Google Maps review; 0% of 1–3 star taps reach Google Maps.
-- **Performance Thresholds:** TTFB `< 300ms` on simulated 4G; Total Interactive Load `< 1000ms`.
-- **Anti-Spam Debounce Rate:** 100% suppression of duplicate taps from the same IP/UA within `< 5s`.
-- **Mobile Usability:** 0 visual or layout defects on viewports from **360px to 430px**.
+## 2. Test environment and deterministic fixtures
 
----
+### Required environment
 
-## 2. Test Matrix Overview
+- App base URL: `http://localhost:3000`
+- Database: isolated local Supabase/PostgreSQL or the project mock store
+- Seed/reset must be repeatable before every integration suite.
+- Never use production data or production credentials in tests.
+- Test evidence must not contain secrets or unnecessary personal data.
 
-| Test ID | Test Category | Scenario | Expected Result |
-|---|---|---|---|
-| **TM-01** | Functional (Shield) | 5-star tap | 300ms visual delay → redirect to `google_review_url` |
-| **TM-02** | Functional (Shield) | 4-star tap | 300ms visual delay → redirect to `google_review_url` |
-| **TM-03** | Functional (Shield) | 3-star tap | Star UI swaps to Feedback Form (Textarea + WA + Submit) |
-| **TM-04** | Functional (Shield) | 2-star tap | Star UI swaps to Feedback Form |
-| **TM-05** | Functional (Shield) | 1-star tap | Star UI swaps to Feedback Form |
-| **TM-06** | Functional (Direct) | Card has `is_shield_active: false` | Instant HTTP 307 redirect to Google Review, no UI flash |
-| **TM-07** | Functional (Fallback)| Invalid or non-existent slug | Friendly fallback view rendered; no raw 404 or stack trace |
-| **TM-08** | Ingestion | Submit internal feedback with text | Saved to `internal_feedbacks` table; thank-you state shown |
-| **TM-09** | Ingestion | Submit internal feedback without text | Allowed (optional field); saved to DB; thank-you state shown |
-| **TM-10** | Integration | Click WhatsApp button | Opens `https://wa.me/{clean_phone}?text={encoded_msg}` |
-| **TM-11** | Integration | Card has no `whatsapp_number` | WhatsApp button gracefully hidden; form still submittable |
-| **TM-12** | Telemetry | Single tap on `/r/[slug]` | Row created in `tap_logs` with parsed OS and UA |
-| **TM-13** | Anti-Spam | Rapid tap x 3 within 3 seconds | Exactly 1 log entry in `tap_logs`; subsequent 2 debounced |
-| **TM-14** | Anti-Spam | Repeat tap after 6 seconds | Second tap logged successfully in `tap_logs` |
-| **TM-15** | Performance | Throttled 4G network | TTFB `< 300ms`, full page interactive `< 1000ms` |
-| **TM-16** | Responsiveness | Viewports 360px, 375px, 390px, 430px | No horizontal scrollbar; touch targets ≥ 48px |
-| **TM-17** | Security | XSS script payload in feedback | Sanitized in DB and client; no execution |
-| **TM-18** | Security | Rating tamper payload (`rating: 5` to `/api/feedback`) | Returns 400 Bad Request (only 1–3 permitted) |
+The shared fixture contract is in [`tests/fixtures/cards.js`](../../tests/fixtures/cards.js).
+The current database seed provides `demo-card` and `direct-card`; the remaining
+fixtures are required for staging/E2E setup and should be seeded by the test
+harness rather than manually created.
 
----
+| Fixture | Shield | WhatsApp | Purpose |
+|---|---:|---:|---|
+| `demo-card` | true | yes | Shield happy path |
+| `direct-card` | false | yes | Pure 307 redirect |
+| `no-wa-card` | true | no | WhatsApp hidden, feedback still works |
+| `long-name-card` | true | yes | Layout and wrapping stress |
+| `special-url-card` | true | yes | Query/fragment redirect handling |
+| `missing-card` | n/a | n/a | Fallback/404 behavior |
 
-## 3. Detailed Test Scenarios & Execution Steps
+Each test must clean up rows it creates, or run against a disposable database.
+Use stable fixture IDs for assertions; do not assert against auto-generated
+timestamps or IDs unless the assertion is specifically about their format.
 
-### Scenario 1: Shield Mode — High Rating Flow (4–5 Stars)
-1. Open browser in mobile viewport (e.g., iPhone 14, 390x844).
-2. Navigate to `http://localhost:3000/r/demo-card` (configured with `is_shield_active: true`).
-3. Verify store name and 5 unfilled stars are displayed cleanly.
-4. Tap star **5**.
-5. **Verify:**
-   - Star 5 and preceding stars visually highlight.
-   - A timer measures approximately **300ms** before navigation occurs.
-   - Browser navigates to the configured `google_review_url`.
-   - In `tap_logs`, verify `selected_stars` is recorded as `5`.
+## 3. API and data contracts under test
 
-### Scenario 2: Shield Mode — Low Rating Flow (1–3 Stars)
-1. Navigate to `http://localhost:3000/r/demo-card`.
-2. Tap star **2**.
-3. **Verify:**
-   - Rating stars are replaced by the feedback container with heading "What can we improve?".
-   - Selected rating (2/5) is indicated.
-   - Textarea is visible and autofocuses or is easily tap-friendly.
-   - Two buttons are visible: **"Submit Feedback"** and **"Send directly via WhatsApp"**.
-4. Type test message: `"Meja agak kotor dan pesanan lama"`.
-5. Click **"Submit Feedback"**.
-6. **Verify:**
-   - Loading indicator appears momentarily.
-   - Successful transition to the Thank-You resolution screen.
-   - Database table `internal_feedbacks` contains:
-     - `card_id`: matches demo card UUID
-     - `rating`: `2`
-     - `feedback_text`: `"Meja agak kotor dan pesanan lama"`
+### `GET /r/[slug]`
 
-### Scenario 3: Direct Mode (Subscription Inactive)
-1. Configure test card with `is_shield_active = false`.
-2. Send request to `http://localhost:3000/r/direct-card`.
-3. **Verify:**
-   - Server returns **HTTP 307 Temporary Redirect**.
-   - Header `Location` matches `google_review_url`.
-   - Zero HTML payload or intermediate rating screen flash is presented.
+- Existing card with `is_shield_active: false`: HTTP 307, exact `Location`,
+  empty or framework-approved redirect body, and no rating UI flash.
+- Existing card with shield active: renders the rating UI.
+- Unknown slug: HTTP 404 with a friendly, non-debug fallback; no stack trace,
+  SQL, environment variable, or internal IDs in the response.
+- Redirect URLs must be HTTPS and validated against the approved Google review
+  host policy. CRLF, `javascript:`, malformed, or empty URLs must not become
+  redirect targets.
 
-### Scenario 4: Anti-Spam Debounce Rule
-1. Run automated script sending 5 consecutive GET requests to `/r/demo-card` with identical User-Agent and IP:
-   - Request 1 at T = 0ms
-   - Request 2 at T = 800ms
-   - Request 3 at T = 2200ms
-   - Request 4 at T = 4500ms
-   - Request 5 at T = 6000ms
-2. Inspect `tap_logs` table.
-3. **Verify:**
-   - Only **2** log records exist:
-     - One corresponding to Request 1 (T = 0ms).
-     - One corresponding to Request 5 (T = 6000ms, outside the 5s window).
-   - Requests 2, 3, and 4 were dropped.
+### `POST /api/feedback`
 
----
+Valid request:
 
-## 4. Device & Responsiveness Matrix
-
-Test across standard mobile viewports in DevTools / Playwright:
-
-| Device Preset | Screen Width | Screen Height | Test Verification Focus |
-|---|---|---|---|
-| **Compact Android** (Galaxy S8 / A series) | `360px` | `740px` | Star touch target spacing, no word clipping |
-| **iPhone SE** (3rd gen) | `375px` | `667px` | Vertical spacing, textarea visibility above keyboard |
-| **iPhone 14 / 15 / 16** | `390px` | `844px` | Standard primary device proportions |
-| **Android Flagship** (Pixel 7 / S23) | `412px` | `915px` | Margins, high-DPI scaling |
-| **iPhone 15/16 Pro Max** | `430px` | `932px` | Max width bounds (`max-w-md`), centered layout |
-
----
-
-## 5. Automated Testing Guidelines (Playwright & Vitest)
-
-### A. Recommended Vitest Unit Tests
-Create unit tests under `tests/unit/`:
-- `tests/unit/parseDeviceOS.test.js`:
-  - `Mozilla/5.0 (iPhone; CPU iPhone OS 17_0...)` → `'iOS'`
-  - `Mozilla/5.0 (Linux; Android 14; SM-S918B...)` → `'Android'`
-  - `Mozilla/5.0 (Windows NT 10.0; Win64; x64...)` → `'Other'`
-- `tests/unit/debounce.test.js`:
-  - Validates `shouldLogTap` drops duplicate calls within 5000ms.
-- `tests/unit/whatsappUrl.test.js`:
-  - Validates phone normalization (stripping spaces, `+`, `-`) and URI component encoding.
-
-### B. Recommended Playwright E2E Tests
-Create E2E tests under `tests/e2e/`:
-- `tests/e2e/rating-flow.spec.js`:
-  - Test 5-star redirect with 300ms timing assertion.
-  - Test 2-star feedback submission.
-  - Test invalid slug fallback display.
-
----
-
-## 6. Bug Reporting Template
-
-When filing issues discovered during verification, follow this format:
-
-```markdown
-### [BUG-ID] Short Title
-
-- **Severity:** Critical | High | Medium | Low
-- **Category:** Functional | Performance | Responsive | Security
-- **Affected Route:** `/r/[slug]` or `/api/...`
-- **Device / Viewport:** e.g., iPhone 14 (390px) on iOS 17 Safari
-
-#### Reproduction Steps:
-1. ...
-2. ...
-
-#### Expected Behavior:
-...
-
-#### Actual Behavior:
-...
-
-#### Evidence / Logs:
-(Screenshot, network HAR trace, or database row dump)
+```json
+{
+  "card_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "rating": 2,
+  "feedback_text": "Pelayanan agak lama saat jam makan siang"
+}
 ```
 
----
+- Rating must be an integer from 1 through 3.
+- `feedback_text` is optional; define and test the distinction between missing,
+  `null`, empty, and whitespace-only values.
+- Validate type, UUID format, and maximum length before persistence.
+- Invalid JSON, unsupported methods, wrong content type, unknown card, and
+  database failures must return an explicit non-success response.
+- A success response must never be returned for a failed insert.
+- Double-click, retry, and parallel submission behavior must be defined and
+  tested for duplicates.
 
-## 7. Definition of Done (QA Agent Sign-Off)
+### `POST /api/telemetry/star`
 
-- [ ] All 18 Test Matrix scenarios (TM-01 through TM-18) verified and passing.
-- [ ] Direct Mode verified to emit pure HTTP 307 without visual flicker.
-- [ ] 300ms transition delay on 4-5 stars verified via performance timeline or Playwright timing assertion.
-- [ ] Anti-spam debounce tested with repeated requests; no spam logs in `tap_logs`.
-- [ ] Responsive design verified on 360px, 375px, 390px, and 430px viewports with zero horizontal scrolling.
-- [ ] Input validation verified for empty, overlength, and special character feedback texts.
-- [ ] Lighthouse audit scores: Performance ≥ 95, Accessibility ≥ 95, Best Practices ≥ 95 on mobile profile.
+- `selected_stars` must be an integer from 1 through 5.
+- `card_id` must be a valid existing UUID.
+- Missing/invalid payloads return 400; unknown cards return 404.
+- A telemetry failure or timeout must not delay or change rating navigation.
+- Test iOS, Android, desktop, empty, long, and malformed User-Agent values.
+
+### `tap_logs` and `internal_feedbacks`
+
+- `selected_stars` is nullable only when the product contract explicitly
+  permits a page-view event; selected ratings remain 1–5.
+- Internal feedback ratings remain 1–3.
+- IP data must be stored only in the approved anonymized form.
+- Anonymous access must not permit reading, updating, or deleting private
+  feedback and telemetry unless explicitly required by the product contract.
+- Verify RLS policies with an anon client and a service-role client separately.
+
+## 4. Functional test matrix
+
+| ID | Scenario | Expected result |
+|---|---|---|
+| TM-01 | Shield, rating 5 | Highlight state, then redirect after 280–400 ms |
+| TM-02 | Shield, rating 4 | Highlight state, then redirect after 280–400 ms |
+| TM-03 | Shield, rating 3 | Feedback form; no Google navigation |
+| TM-04 | Shield, rating 2 | Feedback form; no Google navigation |
+| TM-05 | Shield, rating 1 | Feedback form; no Google navigation |
+| TM-06 | Direct mode | HTTP 307 and exact Google `Location` |
+| TM-07 | Unknown slug | Friendly HTTP 404 fallback without internal details |
+| TM-08 | Feedback with text | Persisted row and success state |
+| TM-09 | Feedback without text | Behavior follows the optional-field contract and is persisted or rejected explicitly |
+| TM-10 | WhatsApp with number | Correct normalized `wa.me` URL and exactly-once encoding |
+| TM-11 | WhatsApp without number | Button hidden; feedback submit remains usable |
+| TM-12 | One telemetry event | One row with expected card, OS, UA, and rating |
+| TM-13 | Duplicate telemetry | Concurrent/rapid duplicates produce one accepted event per debounce key |
+| TM-14 | Event after 5 seconds | Event at 5,001 ms is accepted; boundary at exactly 5,000 ms follows the documented policy |
+| TM-15 | Throttled 4G | Median/p95 thresholds meet the performance budget |
+| TM-16 | Responsive matrix | No horizontal overflow and targets ≥48×48 px |
+| TM-17 | XSS payloads | No script execution on input, success, fallback, or admin rendering surfaces |
+| TM-18 | Rating tampering | Rating 4/5, decimals, strings, null, and out-of-range values return 400 |
+| TM-19 | Unsafe redirect URL | No open redirect or CRLF response splitting |
+| TM-20 | API methods/content types | Unsupported methods and malformed content return explicit errors |
+| TM-21 | Database outage | Customer sees recoverable error; no false success; telemetry remains best-effort |
+| TM-22 | Accessibility | Keyboard, focus, labels, live states, contrast, and reduced motion pass |
+
+## 5. Boundary and security cases
+
+### Feedback input
+
+Test empty, whitespace-only, one character, maximum length, maximum + 1,
+Unicode/emoji, RTL text, newlines, objects, arrays, `null`, invalid JSON, and
+oversized request bodies. The maximum length must be a named contract value,
+not an implicit implementation detail.
+
+### XSS and output encoding
+
+Use payloads such as `<script>alert(1)</script>`,
+`<img src=x onerror=alert(1)>`, `"><svg/onload=alert(1)>`, and
+`javascript:alert(1)` in feedback, store name, slug, URL, and error paths.
+Verify non-execution in every rendered surface. Do not require destructive
+sanitization in storage as a substitute for output escaping.
+
+### Redirect and URL safety
+
+Test empty, malformed, HTTP, non-Google, query-string, fragment, encoded,
+newline, and `javascript:` URLs. The approved-host policy must be documented
+before release.
+
+### Access control and secrets
+
+Verify Supabase RLS, anonymous read/write boundaries, unsupported HTTP methods,
+client bundle contents, error responses, logs, and source maps for leaked
+service-role keys or credentials.
+
+## 6. Device, browser, and accessibility matrix
+
+### Viewports
+
+| Width | Height | Focus |
+|---:|---:|---|
+| 360 | 740 | Compact Android wrapping and touch spacing |
+| 375 | 667 | iPhone SE keyboard/vertical space |
+| 390 | 844 | Primary iPhone layout |
+| 412 | 915 | Android flagship margins |
+| 430 | 932 | Max-width and centered layout |
+
+### Browser conditions
+
+Test current Safari iOS, Chrome Android, Chrome desktop, Safari macOS, and
+Firefox desktop where supported. Include slow/fast 3G, 4G, offline/reconnect,
+back/forward, private browsing, dark mode, reduced motion, 200% zoom, large
+font settings, portrait, and landscape.
+
+### Accessibility checks
+
+- Stars have accessible names and keyboard interaction.
+- Selected rating is announced.
+- Textarea has a visible or programmatic label.
+- Validation and loading/success states are announced.
+- Focus moves to the next relevant state.
+- Color is not the only state indicator.
+- Contrast meets WCAG AA.
+- No broken focus trap or keyboard-only dead end.
+
+## 7. Automation layout and commands
+
+Current Vitest tests live under `tests/unit/` and `tests/integration/`.
+Keep pure logic in unit tests, route/API behavior in integration tests, and
+browser behavior in `tests/e2e/` when Playwright is provisioned.
+
+Recommended layout:
+
+```text
+tests/
+├── fixtures/
+│   ├── cards.js
+│   └── payloads.js
+├── unit/
+├── integration/
+├── e2e/
+├── performance/
+└── helpers/
+```
+
+Current executable command:
+
+```bash
+npm test
+```
+
+When browser tooling is installed in the test environment, add Playwright
+without changing application code and configure traces/screenshots on failure,
+HTML/JUnit reports, a fixed `baseURL`, and isolated fixture cleanup.
+
+## 8. Performance and reliability method
+
+Run at least 10 iterations for cold and warm requests. Report median and p95,
+not a single best result. Measure TTFB from request start to first response
+byte and interactive readiness when star controls are visible and clickable.
+Telemetry must not be on the critical path.
+
+Add burst tests for 10, 50, and 100 requests/second, including one hot slug,
+many slugs, parallel identical debounce keys, database latency, timeouts, and
+Supabase rate limiting. Record error rate, p50/p95/p99 latency, duplicate
+events, dropped telemetry, and database saturation.
+
+## 9. Evidence and bug reporting
+
+Every failed case records request/response status, sanitized payload, browser,
+viewport, timing, database assertion, screenshot/trace when applicable, and a
+correlation ID. Never attach credentials, full secrets, or unnecessary personal
+data.
+
+```markdown
+### [BUG-ID] Short title
+- Severity: Critical | High | Medium | Low
+- Category: Functional | Performance | Responsive | Security | Accessibility
+- Route: `/r/[slug]` or `/api/...`
+- Environment: browser, OS, viewport, network profile
+- Reproduction:
+  1. ...
+- Expected: ...
+- Actual: ...
+- Evidence: sanitized log, screenshot, trace, or database assertion
+```
+
+## 10. Release sign-off
+
+- [ ] TM-01 through TM-22 pass, or each exception has an approved issue.
+- [ ] Fixture seed/reset is repeatable and isolated.
+- [ ] Direct mode is pure HTTP 307 with no UI flash.
+- [ ] High-rating navigation is within the timing tolerance and is not blocked by telemetry.
+- [ ] Low ratings never navigate to Google.
+- [ ] Concurrent debounce behavior is verified at the exact boundary.
+- [ ] Input, URL, XSS, method, RLS, secret, and failure-path tests pass.
+- [ ] Responsive and accessibility checks pass on the supported matrix.
+- [ ] Performance reports include cold/warm median and p95.
+- [ ] Lighthouse mobile targets are met where Lighthouse is available.
+- [ ] Evidence is attached for all release-critical checks.

@@ -3,6 +3,7 @@ import { isValidUUID, isValidRating } from '@/lib/validation';
 import { recordStarTelemetry, getCardById } from '@/lib/db';
 import { parseDeviceOS } from '@/lib/device';
 import { hashIp } from '@/lib/debounce';
+import { getClientMeta } from '@/lib/client-meta';
 
 /**
  * POST /api/telemetry/star
@@ -49,13 +50,7 @@ export async function POST(request) {
     );
   }
 
-  // Extract client metadata from headers
-  const userAgent = request.headers.get('user-agent') || '';
-  const clientIp =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    '';
-
+  const { clientIp, userAgent } = getClientMeta(request.headers);
   const ipHash = hashIp(clientIp);
   const deviceOs = parseDeviceOS(userAgent);
 

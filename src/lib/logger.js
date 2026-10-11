@@ -33,6 +33,40 @@ export async function logTapAsync({
 }
 
 /**
+ * Build a debounced tap-log promise (or null if suppressed).
+ * Prefer scheduling the returned promise with Next.js `after()` so the write
+ * can finish after the response is sent without delaying TTFB.
+ *
+ * @param {Object} params
+ * @param {string} params.cardId
+ * @param {string} [params.clientIp='']
+ * @param {string} [params.userAgent='']
+ * @param {number} [params.selectedStars]
+ * @returns {Promise<Object|null>|null}
+ */
+export function queueTapTelemetry({
+  cardId,
+  clientIp = '',
+  userAgent = '',
+  selectedStars = null,
+}) {
+  if (!shouldLogTap(cardId, clientIp, userAgent)) {
+    return null; // Suppressed by < 5-second anti-spam debounce
+  }
+
+  const os = parseDeviceOS(userAgent);
+  const ipHash = hashIp(clientIp);
+
+  return logTapAsync({
+    card_id: cardId,
+    device_os: os,
+    user_agent: userAgent,
+    ip_hash: ipHash,
+    selected_stars: selectedStars,
+  });
+}
+
+/**
  * Handle incoming physical tap telemetry with anti-spam debouncing.
  * Non-blocking fire-and-forget: does not block the caller or delay response rendering.
  *
@@ -49,21 +83,18 @@ export function handleTapTelemetry({
   userAgent = '',
   selectedStars = null,
 }) {
-  if (!shouldLogTap(cardId, clientIp, userAgent)) {
-    return false; // Suppressed by < 5-second anti-spam debounce
+  const pending = queueTapTelemetry({
+    cardId,
+    clientIp,
+    userAgent,
+    selectedStars,
+  });
+
+  if (!pending) {
+    return false;
   }
 
-  // Fire and forget asynchronous database insert
-  const os = parseDeviceOS(userAgent);
-  const ipHash = hashIp(clientIp);
-
-  logTapAsync({
-    card_id: cardId,
-    device_os: os,
-    user_agent: userAgent,
-    ip_hash: ipHash,
-    selected_stars: selectedStars,
-  }).catch((err) => {
+  pending.catch((err) => {
     console.error('[logger] Error in fire-and-forget telemetry:', err);
   });
 
