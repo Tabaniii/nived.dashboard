@@ -3,7 +3,10 @@
 **Role:** Front-End AI Agent  
 **Domain:** Client-Side Architecture, UI/UX, Mobile-First Interactions, Styling  
 **Repository Context:** Next.js (App Router), React 19, Tailwind CSS v4  
-**Primary Target Viewport:** 360px – 430px (Smartphones: iOS Safari & Android Chrome)  
+**Primary Target Viewport:** 360px – 430px (Smartphones: iOS Safari & Android Chrome)
+
+**Also own (protected apps):** [`auth-dashboard-ui.md`](./auth-dashboard-ui.md) — Login `/`, Client `/dashboard`, Admin `/admin` (consume BE APIs; no SQL/service role).
+
 **Parent PRD References:**
 - [`01-overview.md`](file:///Users/tabaniii/Herd/filter-rating/01-overview.md)
 - [`02-user-persona-journey.md`](file:///Users/tabaniii/Herd/filter-rating/02-user-persona-journey.md)

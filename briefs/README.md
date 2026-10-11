@@ -1,118 +1,75 @@
-# NFC Public Web (filter-rating) — Multi-Agent Brief Master Index
+# Nived NFC Platform — Multi-Agent Brief Master Index
 
-This directory contains role-specific engineering briefs for the AI agents building and verifying the **NFC Public Web (filter-rating)** application.
+Role-specific briefs for agents building **filter-rating** (Reputation Shield + Auth Dashboard + Admin).
 
 ---
 
-## 1. System Overview & Architecture
+## Ownership (jangan saling nyerobot)
 
-The **NFC Public Web** is a lightweight, mobile-first middleware web application. Customers tap an in-store NFC card or scan a QR code at a table or cashier counter, hitting `https://domain.com/r/[slug]`. 
+| Role | Folder | Owns | Does NOT own |
+|---|---|---|---|
+| **Back-End** | [`briefs/back-end/`](./back-end/) | Schema/RLS, `/r/[slug]` server logic, APIs, middleware session/role, seed admin | UI components, visual polish, E2E test authorship |
+| **Front-End** | [`briefs/front-end/`](./front-end/) | `/r/[slug]` UI, login portal UI, `/dashboard` UI, `/admin` UI | SQL migrations, RLS, service-role code, secret env |
+| **QA** | [`briefs/qa/`](./qa/) | Tests under `tests/`, fixtures, NFR checks, auth/RBAC test matrix | App implementation (FE/BE) |
 
-The system acts as a **Reputation Shield**:
-- **High ratings (4–5 stars):** Redirect instantly to the store's public Google Business Profile review page.
-- **Low ratings (1–3 stars):** Captured internally (private database feedback form or WhatsApp direct message) to shield public reviews and resolve customer dissatisfaction privately.
-- **Direct Mode:** When the store's subscription is inactive (`is_shield_active: false`), instantly HTTP 307 redirects to Google Reviews with no intermediary UI.
-- **Background Telemetry:** Logs physical card taps asynchronously, debounced (< 5s per IP/User-Agent) to avoid spam.
+---
+
+## System map
 
 ```
-                    ┌────────────────────────┐
-                    │ Customer Taps NFC / QR │
-                    └───────────┬────────────┘
-                                │ GET /r/[slug]
-                                ▼
-                    ┌────────────────────────┐
-                    │ Next.js Route / Page   │
-                    │   - Validate Slug      │
-                    │   - Check Shield Mode  │
-                    │   - Async Tap Logger   │
-                    └───────────┬────────────┘
-                                │
-        ┌───────────────────────┴───────────────────────┐
-        │ [Direct Mode / Inactive]                      │ [Shield Mode Active]
-        ▼                                               ▼
-┌───────────────────────────┐               ┌───────────────────────────┐
-│ HTTP 307 Instant Redirect │               │ Render Rating UI (< 1s)   │
-│ to Google Maps Review URL │               │ 1–5 Interactive Stars     │
-└───────────────────────────┘               └─────────────┬─────────────┘
-                                                          │
-                        ┌─────────────────────────────────┴─────────────────────────────────┐
-                        │ [Taps 4 or 5 Stars]                                               │ [Taps 1, 2, or 3 Stars]
-                        ▼                                                                   ▼
-        ┌───────────────────────────────┐                                   ┌───────────────────────────────┐
-        │ 300ms visual micro-feedback   │                                   │ Smooth transition to internal │
-        │ Update tap_log (selected_stars│                                   │ feedback card:                │
-        │ window.location.href to Google│                                   │ - Textarea (What to improve?) │
-        └───────────────────────────────┘                                   │ - Submit Button -> DB         │
-                                                                            │ - Direct WhatsApp Button      │
-                                                                            └───────────────────────────────┘
+Public NFC          Auth gateway           Protected apps
+/r/[slug]    →      /  (login only)   →    /dashboard  (role: client)
+API feedback/star                          /admin      (role: admin)
 ```
 
----
-
-## 2. Agent Directory & Navigation
-
-Each agent has a dedicated brief located in its respective subfolder:
-
-| Role | Brief Location | Core Responsibility |
-|---|---|---|
-| **Front-End Agent** | [`briefs/front-end/README.md`](file:///Users/tabaniii/Herd/filter-rating/briefs/front-end/README.md) | Mobile-first UI (360–430px), star rating interactions, 300ms transition delay, feedback forms, WhatsApp link formatting, fallback UI, sub-1s load budget. |
-| **Back-End Agent** | [`briefs/back-end/README.md`](file:///Users/tabaniii/Herd/filter-rating/briefs/back-end/README.md) | Next.js dynamic route `/r/[slug]`, HTTP 307 redirects, Supabase schema & queries, non-blocking asynchronous tap logging, <5s IP debounce, feedback submission API. |
-| **QA Agent** | [`briefs/qa/README.md`](file:///Users/tabaniii/Herd/filter-rating/briefs/qa/README.md) | End-to-end test scenarios, NFR performance benchmarking (TTFB <300ms, load <1s), anti-spam debounce tests, device matrix (360–430px), automated test suites. |
+- **No public register.** Admin membuat merchant + email/password client + slug NFC.
+- Client login → `/dashboard`. Admin login → `/admin`.
+- NFC writer fisik = tool eksternal; platform hanya sediakan URL `/r/{slug}` (+ QR dari FE admin).
 
 ---
 
-## 3. Inter-Agent Communication & Interface Contracts
+## Brief index
 
-### A. Route & Data Flow Contract
-1. **Server Component → Client Component:**
-   The page at `/r/[slug]` fetches the card configuration on the server:
-   ```ts
-   interface CardConfig {
-     id: string;              // UUID
-     slug: string;
-     store_name: string;
-     google_review_url: string;
-     whatsapp_number?: string | null;
-     is_shield_active: boolean;
-   }
-   ```
-2. **Telemetry Logging API (`POST /api/telemetry/star`):**
-   When a customer taps any star (1–5), the front-end asynchronously notifies the back-end to record `selected_stars` against the session/tap log.
-   - Payload: `{ card_id: string, selected_stars: number, session_id?: string }`
-   - Response: `{ success: true }`
+### Back-End
+- [`back-end/README.md`](./back-end/README.md) — misi & DoD BE
+- [`back-end/brief.md`](./back-end/brief.md) — NFC hot path (existing)
+- [`back-end/auth-dashboard-api.md`](./back-end/auth-dashboard-api.md) — kontrak API Auth/Dashboard/Admin
 
-3. **Feedback Submission API (`POST /api/feedback`):**
-   When 1–3 star feedback is submitted:
-   - Request Body:
-     ```json
-     {
-       "card_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
-       "rating": 2,
-       "feedback_text": "Pelayanan agak lama saat jam makan siang"
-     }
-     ```
-   - Response:
-     ```json
-     { "success": true, "message": "Feedback submitted successfully" }
-     ```
+### Front-End
+- [`front-end/README.md`](./front-end/README.md) — NFC public UI (existing)
+- [`front-end/auth-dashboard-ui.md`](./front-end/auth-dashboard-ui.md) — Login + Client Dashboard + Admin UI
 
-4. **WhatsApp URL Protocol:**
-   Target format:
-   ```
-   https://wa.me/{clean_whatsapp_number}?text={url_encoded_message}
-   ```
-   *Example message:* `Halo Tim {store_name}, saya ada masukan terkait kunjungan saya: ...`
+### QA
+- [`qa/README.md`](./qa/README.md) — NFC QA plan (existing)
+- [`qa/auth-dashboard-qa.md`](./qa/auth-dashboard-qa.md) — Auth/RBAC/Dashboard/Admin test matrix
 
 ---
 
-## 4. Shared Tech Stack & Constraints
+## Shared contracts (ringkas)
 
-- **Framework:** Next.js 16 (App Router)
-- **Library:** React 19
-- **CSS Engine:** Tailwind CSS v4
-- **Database:** Supabase / PostgreSQL
-- **Target Viewport:** 360px to 430px (iPhone SE, iPhone 14/15/16, Samsung Galaxy, Pixel)
-- **Performance Budget:** 
-  - Time To First Byte (TTFB): `< 300ms` on 4G
-  - Total Interactive Load: `< 1000ms`
-  - Zero heavy animation or icon libraries (keep client bundle minimal)
+**Public NFC**
+- `GET /r/[slug]` — shield UI atau HTTP 307 Direct Mode
+- `POST /api/telemetry/star` — `{ card_id, selected_stars }`
+- `POST /api/feedback` — `{ card_id, rating(1-3), feedback_text? }`
+
+**Auth / protected** — lihat [`back-end/auth-dashboard-api.md`](./back-end/auth-dashboard-api.md)
+
+**Stack:** Next.js 16 App Router · React 19 · Tailwind v4 · Supabase (Auth + Postgres + RLS)
+
+---
+
+## Setup cepat (semua agent)
+
+```bash
+# Env
+cp .env.example .env   # isi Supabase keys + NEXT_PUBLIC_APP_URL
+
+# Migrasi (Supabase CLI / SQL editor)
+# 20261008000000_init_schema.sql
+# 20261012000000_auth_dashboard_admin.sql
+
+npm run seed:admin     # buat user admin pertama
+npm run dev
+```
+
+Seed NFC demo slugs: `demo-card` (shield), `direct-card` (direct 307).

@@ -17,7 +17,7 @@ export async function POST(request) {
     );
   }
 
-  const { card_id, rating, feedback_text } = body || {};
+  const { card_id, rating, feedback_text, customer_whatsapp } = body || {};
 
   // 1. Validate card_id (must be valid UUID format)
   if (!card_id || !isValidUUID(card_id)) {
@@ -38,7 +38,7 @@ export async function POST(request) {
     );
   }
 
-  // 3. Verify card exists
+  // 3. Verify card exists (and is not soft-deleted)
   const card = await getCardById(card_id);
   if (!card) {
     return NextResponse.json(
@@ -47,8 +47,12 @@ export async function POST(request) {
     );
   }
 
-  // 4. Sanitize feedback text
+  // 4. Sanitize feedback text + optional customer WhatsApp
   const sanitizedText = sanitizeText(feedback_text || '', 2000);
+  const sanitizedWa = sanitizeText(customer_whatsapp || '', 30).replace(
+    /[^\d+]/g,
+    ''
+  );
 
   // 5. Persist to database
   try {
@@ -56,6 +60,7 @@ export async function POST(request) {
       card_id,
       rating: Number(rating),
       feedback_text: sanitizedText,
+      customer_whatsapp: sanitizedWa || null,
     });
 
     if (!feedback) {

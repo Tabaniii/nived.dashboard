@@ -5,7 +5,9 @@ its Supabase/PostgreSQL contract. QA changes must stay in `tests/`, test
 configuration, and `briefs/qa/`; do not change application frontend/backend
 implementation while executing this plan.
 
-**Canonical document:** This file is the single source of truth. `brief.md`
+**Also own (auth platform):** [`auth-dashboard-qa.md`](./auth-dashboard-qa.md) — login, RBAC middleware, admin provisioning, client dashboard APIs, export sanitization.
+
+**Canonical document (NFC):** This file is the source of truth for public `/r/[slug]` QA. `brief.md`
 exists only as a compatibility pointer.
 
 ## 1. Quality objectives

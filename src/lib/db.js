@@ -44,6 +44,7 @@ export async function getCardBySlug(slug) {
         .from('cards')
         .select('*')
         .eq('slug', slug)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (error) {
@@ -58,7 +59,7 @@ export async function getCardBySlug(slug) {
   }
 
   // Fallback to in-memory store
-  const found = mockCards.find((c) => c.slug === slug);
+  const found = mockCards.find((c) => c.slug === slug && !c.deleted_at);
   return found ? { ...found } : null;
 }
 
@@ -77,6 +78,7 @@ export async function getCardById(id) {
         .from('cards')
         .select('*')
         .eq('id', id)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (error) {
@@ -91,7 +93,7 @@ export async function getCardById(id) {
   }
 
   // Fallback to in-memory store
-  const found = mockCards.find((c) => c.id === id);
+  const found = mockCards.find((c) => c.id === id && !c.deleted_at);
   return found ? { ...found } : null;
 }
 
@@ -234,13 +236,20 @@ export async function recordStarTelemetry({
  * @param {string} entry.card_id
  * @param {number} entry.rating
  * @param {string} [entry.feedback_text]
+ * @param {string} [entry.customer_whatsapp]
  * @returns {Promise<Object|null>}
  */
-export async function createFeedback({ card_id, rating, feedback_text = '' }) {
+export async function createFeedback({
+  card_id,
+  rating,
+  feedback_text = '',
+  customer_whatsapp = null,
+}) {
   const row = {
     card_id,
     rating,
     feedback_text: feedback_text || null,
+    customer_whatsapp: customer_whatsapp || null,
     created_at: new Date().toISOString(),
   };
 
