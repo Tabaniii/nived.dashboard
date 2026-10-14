@@ -21,7 +21,7 @@ export default function FeedbackBox({ feedbacks = [] }) {
             <span>Private Feedback Box (Reputation Shield)</span>
           </h2>
           <p className="text-xs text-zinc-400">
-            Keluhan pelanggan bintang 1–3 yang terlindungi dari ulasan publik Google Maps
+            Rating dan masukan pelanggan yang dikirim langsung dari halaman slug
           </p>
         </div>
 

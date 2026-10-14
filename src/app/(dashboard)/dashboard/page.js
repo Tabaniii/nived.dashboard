@@ -44,8 +44,8 @@ export default async function ClientDashboardPage() {
           label="Ulasan Positif (4–5★)"
           value={data.kpi.positiveReviews}
           icon={Star}
-          hint="Berhasil dialihkan ke Google Maps"
-          badge="Publik"
+          hint="Rating positif dari halaman slug"
+          badge="Internal"
         />
         <StatCard
           label="Keluhan Terlindungi (1–3★)"

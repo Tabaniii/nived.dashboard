@@ -65,7 +65,7 @@ The client component (`RatingClientView.js`) must manage 4 distinct visual state
 │ - Highlight selected stars│         │ - Replace stars with      │
 │ - 300ms transition delay  │         │   Feedback Container      │
 │ - Trigger background log  │         │ - "What can we improve?"  │
-│ - Redirect to Google Maps │         │ - Optional Textarea       │
+│ - Submit rating on slug  │         │ - Optional Textarea       │
 │   via window.location.href│         │ - [Submit Feedback]       │
 └───────────────────────────┘         │ - [Send via WhatsApp]     │
                                       └─────────────┬─────────────┘

@@ -58,27 +58,16 @@ function recordStarTelemetry(cardId, star) {
 export default function RatingClientView({ card }) {
   const [selectedRating, setSelectedRating] = useState(null);
   const [hoverRating, setHoverRating] = useState(0);
-  const [isRedirecting, setIsRedirecting] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
   const handleStarClick = (star) => {
-    if (isRedirecting || isSubmitting) return;
+    if (isSubmitting) return;
 
     setSelectedRating(star);
     recordStarTelemetry(card?.id, star);
-
-    if (star >= 4) {
-      // 4 or 5 Stars: Reputation shield triggers Google Maps review redirect after 300ms
-      setIsRedirecting(true);
-      setTimeout(() => {
-        if (card?.google_review_url) {
-          window.location.href = card.google_review_url;
-        }
-      }, 300);
-    }
   };
 
   const handleFeedbackSubmit = async (e) => {
@@ -179,16 +168,16 @@ export default function RatingClientView({ card }) {
               NFC Reputation Shield
             </div>
           </div>
-        ) : selectedRating && selectedRating <= 3 ? (
-          /* State 3: Low Rating Feedback Form (1-3 Stars) */
+        ) : selectedRating ? (
+          /* State 3: Rating Feedback Form (1-5 Stars) */
           <div className="py-2 text-left">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div>
                 <h2 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">
-                  Apa yang bisa kami tingkatkan?
+                  Bagaimana pengalaman Anda?
                 </h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Kami menghargai masukan jujur Anda untuk pelayanan lebih baik.
+                  Rating Anda tersimpan langsung dari halaman ini.
                 </p>
               </div>
               <button
@@ -241,7 +230,7 @@ export default function RatingClientView({ card }) {
                   htmlFor="feedback-input"
                   className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5"
                 >
-                  Tuliskan saran atau keluhan Anda (opsional)
+                  Tuliskan masukan Anda (opsional)
                 </label>
                 <textarea
                   id="feedback-input"
@@ -298,9 +287,7 @@ export default function RatingClientView({ card }) {
           /* State 1 & 2: Star Rating Component (1-5 Stars) */
           <div className="py-4 space-y-4">
             <h2 className="text-base font-medium text-zinc-700 dark:text-zinc-300">
-              {isRedirecting
-                ? 'Membuka Google Review...'
-                : 'Bagikan pengalaman Anda (1–5 bintang)'}
+              Bagikan pengalaman Anda (1–5 bintang)
             </h2>
 
             <div
@@ -316,12 +303,12 @@ export default function RatingClientView({ card }) {
                     type="button"
                     role="button"
                     aria-label={`Beri rating ${star} bintang`}
-                    disabled={isRedirecting}
+                    disabled={isSubmitting}
                     onClick={() => handleStarClick(star)}
-                    onMouseEnter={() => !isRedirecting && setHoverRating(star)}
-                    onMouseLeave={() => !isRedirecting && setHoverRating(0)}
+                    onMouseEnter={() => !isSubmitting && setHoverRating(star)}
+                    onMouseLeave={() => !isSubmitting && setHoverRating(0)}
                     className={`min-w-[48px] min-h-[48px] w-12 h-12 flex items-center justify-center p-1 rounded-2xl transition-transform duration-150 ${
-                      isRedirecting
+                      isSubmitting
                         ? 'cursor-default'
                         : 'active:scale-95 hover:scale-105 cursor-pointer'
                     } focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500`}
@@ -348,15 +335,6 @@ export default function RatingClientView({ card }) {
               })}
             </div>
 
-            {isRedirecting && (
-              <div
-                aria-live="polite"
-                className="flex items-center justify-center gap-2 pt-1 text-xs font-medium text-amber-600 dark:text-amber-400 animate-pulse"
-              >
-                <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                <span>Mengarahkan ke Google Review...</span>
-              </div>
-            )}
           </div>
         )}
       </div>

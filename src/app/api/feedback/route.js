@@ -4,7 +4,7 @@ import { getCardById, createFeedback } from '@/lib/db';
 
 /**
  * POST /api/feedback
- * Records internal customer feedback for low ratings (1-3 stars).
+ * Records customer ratings and optional internal feedback for 1-5 stars.
  */
 export async function POST(request) {
   let body;
@@ -27,12 +27,12 @@ export async function POST(request) {
     );
   }
 
-  // 2. Validate rating (strictly integer between 1 and 3)
-  if (!isValidRating(rating, 1, 3)) {
+  // 2. Validate rating (strictly integer between 1 and 5)
+  if (!isValidRating(rating, 1, 5)) {
     return NextResponse.json(
       {
         error: 'Validation error',
-        message: 'Rating must be an integer between 1 and 3',
+        message: 'Rating must be an integer between 1 and 5',
       },
       { status: 400 }
     );

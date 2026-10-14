@@ -48,7 +48,7 @@ API feedback/star                          /admin      (role: admin)
 ## Shared contracts (ringkas)
 
 **Public NFC**
-- `GET /r/[slug]` — shield UI atau HTTP 307 Direct Mode
+- `GET /r/[slug]` — rating UI untuk semua kartu aktif
 - `POST /api/telemetry/star` — `{ card_id, selected_stars }`
 - `POST /api/feedback` — `{ card_id, rating(1-3), feedback_text? }`
 
@@ -74,4 +74,4 @@ npm run seed:admin     # buat user admin pertama
 npm run dev
 ```
 
-Seed NFC demo slugs: `demo-card` (shield), `direct-card` (direct 307).
+Seed NFC demo slugs: `demo-card` dan `direct-card` (keduanya rating UI).

@@ -9,7 +9,7 @@ describe('API: POST /api/feedback', () => {
     resetMockStore();
   });
 
-  it('records feedback successfully for 1-3 star ratings (TM-08)', async () => {
+  it('records feedback successfully for 1-5 star ratings', async () => {
     const payload = {
       card_id: validCardId,
       rating: 2,
@@ -57,10 +57,10 @@ describe('API: POST /api/feedback', () => {
     expect(store.feedbacks[0].rating).toBe(1);
   });
 
-  it('rejects tampered rating > 3 (e.g. 4 or 5) with 400 Bad Request (TM-18)', async () => {
+  it('accepts a 5-star rating submitted from the slug page', async () => {
     const payload = {
       card_id: validCardId,
-      rating: 5, // Tampering attempt: rating 5 must not be saved to internal_feedbacks
+      rating: 5,
       feedback_text: 'Great place',
     };
 
@@ -71,13 +71,14 @@ describe('API: POST /api/feedback', () => {
     });
 
     const res = await POST(req);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
 
     const body = await res.json();
-    expect(body.error).toBe('Validation error');
+    expect(body.success).toBe(true);
 
     const store = getMockStore();
-    expect(store.feedbacks).toHaveLength(0);
+    expect(store.feedbacks).toHaveLength(1);
+    expect(store.feedbacks[0].rating).toBe(5);
   });
 
   it('rejects invalid or missing card_id with 400 Bad Request', async () => {

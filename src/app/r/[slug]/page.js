@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { after, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { getCardBySlug } from '@/lib/db';
 import { queueTapTelemetry } from '@/lib/logger';
 import { getClientMeta } from '@/lib/client-meta';
@@ -63,11 +63,6 @@ export default async function CardRoutePage({ params }) {
     userAgent,
   });
 
-  // Direct Mode: explicit HTTP 307 Temporary Redirect (no HTML shell)
-  if (action.type === 'direct_redirect') {
-    return NextResponse.redirect(action.url, action.status);
-  }
-
-  // Shield Mode: render rating UI (front-end owns the view)
+  // Render rating UI for every active card; ratings stay on the slug page.
   return <RatingClientView card={action.card} />;
 }

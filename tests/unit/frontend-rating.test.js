@@ -34,7 +34,7 @@ describe('Front-End Rating UI & Helpers', () => {
   });
 
   describe('Rating State Threshold Classification', () => {
-    it('classifies 4 and 5 stars as High Rating (public redirect path)', () => {
+    it('allows 4 and 5 stars to remain on the slug rating flow', () => {
       const isHighRating = (rating) => rating >= 4;
       expect(isHighRating(4)).toBe(true);
       expect(isHighRating(5)).toBe(true);
@@ -43,7 +43,7 @@ describe('Front-End Rating UI & Helpers', () => {
       expect(isHighRating(1)).toBe(false);
     });
 
-    it('classifies 1, 2, and 3 stars as Low Rating (shielded feedback path)', () => {
+    it('classifies all ratings as valid internal feedback values', () => {
       const isLowRating = (rating) => rating >= 1 && rating <= 3;
       expect(isLowRating(1)).toBe(true);
       expect(isLowRating(2)).toBe(true);

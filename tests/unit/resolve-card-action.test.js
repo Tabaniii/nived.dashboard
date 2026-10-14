@@ -6,7 +6,7 @@ describe('resolveCardAction', () => {
     expect(resolveCardAction(null)).toEqual({ type: 'fallback' });
   });
 
-  it('returns HTTP 307 direct redirect when shield is inactive (TM-06)', () => {
+  it('keeps inactive-shield cards on the slug rating flow', () => {
     const card = {
       id: 'a23deb4d-4b7d-4bad-9bdd-2b0d7b3dcb6e',
       slug: 'direct-card',
@@ -14,11 +14,7 @@ describe('resolveCardAction', () => {
       google_review_url: 'https://maps.app.goo.gl/direct-review',
     };
 
-    expect(resolveCardAction(card)).toEqual({
-      type: 'direct_redirect',
-      url: 'https://maps.app.goo.gl/direct-review',
-      status: 307,
-    });
+    expect(resolveCardAction(card)).toEqual({ type: 'shield_ui', card });
   });
 
   it('returns shield_ui when shield is active', () => {
