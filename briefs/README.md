@@ -63,6 +63,8 @@ API feedback/star                          /admin      (role: admin)
 ```bash
 # Env
 cp .env.example .env   # isi Supabase keys + NEXT_PUBLIC_APP_URL
+# Staging: NEXT_PUBLIC_APP_URL=https://staging.example.com
+# Gunakan URL deployment staging, bukan localhost, agar URL NFC/QR siap dibagikan.
 
 # Migrasi (Supabase CLI / SQL editor)
 # 20261008000000_init_schema.sql
