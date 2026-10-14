@@ -1,3 +1,4 @@
+import { connection } from 'next/server';
 import { redirect } from 'next/navigation';
 import AppShell from '@/components/shell/AppShell';
 import { getClientContext } from './queries';
@@ -10,6 +11,7 @@ const nav = [
 export const instant = false;
 
 export default async function DashboardLayout({ children }) {
+  await connection();
   const ctx = await getClientContext();
   if (!ctx) {
     redirect('/');

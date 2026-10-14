@@ -159,7 +159,7 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                       tickLine={false}
                       axisLine={false}
                     />
-                    <Tooltip content={<CustomTooltip unit="taps" />} />
+                    <Tooltip cursor={{ stroke: '#3f3f46', strokeDasharray: '3 3' }} content={<CustomTooltip unit="taps" />} />
                     <Line
                       type="monotone"
                       dataKey="count"
@@ -215,7 +215,7 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                       tickLine={false}
                       axisLine={false}
                     />
-                    <Tooltip content={<CustomTooltip unit="taps" />} />
+                    <Tooltip cursor={false} content={<CustomTooltip unit="taps" />} />
                     <Bar dataKey="count" fill="#34d399" radius={[6, 6, 0, 0]} maxBarSize={36} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -263,7 +263,7 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                       tickLine={false}
                       axisLine={false}
                     />
-                    <Tooltip content={<CustomTooltip unit="taps" />} />
+                    <Tooltip cursor={false} content={<CustomTooltip unit="taps" />} />
                     <Bar dataKey="count" fill="#6ee7b7" radius={[4, 4, 0, 0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>

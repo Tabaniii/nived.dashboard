@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -21,11 +22,15 @@ const COLORS = {
 const CustomTooltip = ({ active, payload, label, total = 0 }) => {
   if (active && payload && payload.length) {
     const val = payload[0].value;
+    const color = payload[0]?.payload?.color || COLORS[label] || '#10b981';
     const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
     return (
       <div className="rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 text-xs shadow-xl backdrop-blur-md">
-        <p className="font-semibold text-zinc-300">{label}</p>
-        <p className="mt-1 font-bold text-emerald-400">
+        <div className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full" style={{ backgroundColor: color }} />
+          <p className="font-semibold text-zinc-300">{label}</p>
+        </div>
+        <p className="mt-1 font-bold" style={{ color }}>
           {val.toLocaleString('id-ID')} <span className="font-normal text-zinc-500">taps</span>
         </p>
         <p className="text-[11px] text-zinc-500 mt-0.5">{pct}% dari total taps</p>
@@ -36,6 +41,8 @@ const CustomTooltip = ({ active, payload, label, total = 0 }) => {
 };
 
 export default function DeviceChart({ breakdown }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+
   const ios = breakdown?.iOS || 0;
   const android = breakdown?.Android || 0;
   const other = breakdown?.Other || 0;
@@ -69,14 +76,31 @@ export default function DeviceChart({ breakdown }) {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 12, right: 12, left: -20, bottom: 0 }}>
+            <BarChart
+              data={data}
+              margin={{ top: 12, right: 12, left: -20, bottom: 0 }}
+              onMouseLeave={() => setActiveIndex(null)}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
               <XAxis dataKey="name" stroke="#71717a" fontSize={11} tickLine={false} axisLine={{ stroke: '#27272a' }} />
               <YAxis stroke="#71717a" fontSize={10} allowDecimals={false} tickLine={false} axisLine={false} />
-              <Tooltip content={<CustomTooltip total={total} />} />
-              <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={48}>
-                {data.map((entry) => (
-                  <Cell key={`cell-${entry.name}`} fill={entry.color} />
+              <Tooltip cursor={false} content={<CustomTooltip total={total} />} />
+              <Bar
+                dataKey="value"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={48}
+                onMouseEnter={(_, index) => setActiveIndex(index)}
+              >
+                {data.map((entry, index) => (
+                  <Cell
+                    key={`cell-${entry.name}`}
+                    fill={entry.color}
+                    opacity={activeIndex === null || activeIndex === index ? 1 : 0.45}
+                    style={{
+                      transition: 'opacity 0.2s ease, filter 0.2s ease',
+                      filter: activeIndex === index ? 'brightness(1.15)' : 'none',
+                    }}
+                  />
                 ))}
               </Bar>
             </BarChart>
@@ -86,10 +110,20 @@ export default function DeviceChart({ breakdown }) {
 
       {/* Percentage Indicators */}
       <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-800/60 text-center">
-        {data.map((item) => {
+        {data.map((item, index) => {
           const pct = total > 0 ? ((item.value / total) * 100).toFixed(0) : 0;
+          const isHighlighted = activeIndex === index;
           return (
-            <div key={item.name} className="rounded-xl bg-zinc-950/50 p-2 border border-zinc-800/40">
+            <div
+              key={item.name}
+              onMouseEnter={() => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
+              className={`rounded-xl p-2 border transition-all cursor-pointer ${
+                isHighlighted
+                  ? 'bg-zinc-800/90 border-zinc-700 shadow-sm scale-[1.02]'
+                  : 'bg-zinc-950/50 border-zinc-800/40 hover:border-zinc-700/60'
+              }`}
+            >
               <div className="flex items-center justify-center gap-1 text-[11px] text-zinc-400">
                 <span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />
                 <span>{item.name}</span>

@@ -1,6 +1,8 @@
+import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function getClientContext() {
+  await connection();
   const supabase = await createClient();
   const {
     data: { user },
@@ -36,6 +38,7 @@ export async function getClientCards(merchantId) {
 }
 
 export async function getClientDashboardData(merchantId) {
+  await connection();
   const supabase = await createClient();
   const cards = await getClientCards(merchantId);
   const cardIds = cards.map((c) => c.id);

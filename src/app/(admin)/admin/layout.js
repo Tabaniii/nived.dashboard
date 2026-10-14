@@ -1,3 +1,4 @@
+import { connection } from 'next/server';
 import { redirect } from 'next/navigation';
 import AppShell from '@/components/shell/AppShell';
 import { getAdminProfile } from './queries';
@@ -12,6 +13,7 @@ const nav = [
 ];
 
 export default async function AdminLayout({ children }) {
+  await connection();
   const profile = await getAdminProfile();
   if (!profile) {
     redirect('/');

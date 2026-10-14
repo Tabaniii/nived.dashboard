@@ -1,7 +1,9 @@
+import { connection } from 'next/server';
 import { createAdminClient, isAdminClientConfigured } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 export async function getAdminOverview() {
+  await connection();
   if (!isAdminClientConfigured()) {
     return {
       totalTaps: 0,
@@ -91,6 +93,7 @@ export async function listTelemetry({ limit = 200 } = {}) {
 
 /** Session-scoped check using cookie client (RLS). */
 export async function getAdminProfile() {
+  await connection();
   const supabase = await createClient();
   const {
     data: { user },
