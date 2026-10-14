@@ -75,7 +75,8 @@ export async function getClientDashboardData(merchantId) {
     supabase
       .from('internal_feedbacks')
       .select('id', { count: 'exact', head: true })
-      .in('card_id', cardIds),
+      .in('card_id', cardIds)
+      .lte('rating', 3),
   ]);
 
   if (tapsResult.error) throw tapsResult.error;

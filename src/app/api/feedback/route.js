@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isValidUUID, isValidRating, sanitizeText } from '@/lib/validation';
 import { getCardById, createFeedback } from '@/lib/db';
+import { getReviewOutcome } from '@/lib/review-routing';
 
 /**
  * POST /api/feedback
@@ -38,8 +39,15 @@ export async function POST(request) {
     );
   }
 
+  if (feedback_text != null && typeof feedback_text !== 'string') {
+    return NextResponse.json(
+      { error: 'Validation error', message: 'Feedback must be text' },
+      { status: 400 }
+    );
+  }
+
   // 3. Verify card exists (and is not soft-deleted)
-  const card = await getCardById(card_id);
+  const card = await getCardById(card_id.trim());
   if (!card) {
     return NextResponse.json(
       { error: 'Card not found', message: 'The referenced card does not exist' },
@@ -57,7 +65,7 @@ export async function POST(request) {
   // 5. Persist to database
   try {
     const feedback = await createFeedback({
-      card_id,
+      card_id: card.id,
       rating: Number(rating),
       feedback_text: sanitizedText,
       customer_whatsapp: sanitizedWa || null,
@@ -75,6 +83,8 @@ export async function POST(request) {
         success: true,
         message: 'Feedback submitted successfully',
         id: feedback.id,
+        feedback_text: sanitizedText,
+        ...getReviewOutcome(Number(rating), card.google_review_url),
       },
       { status: 201 }
     );

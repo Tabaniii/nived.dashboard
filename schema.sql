@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS cards (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug VARCHAR(100) UNIQUE NOT NULL,
     store_name VARCHAR(255) NOT NULL,
+    logo_url TEXT,
     google_review_url TEXT NOT NULL,
     whatsapp_number VARCHAR(30),
     is_shield_active BOOLEAN NOT NULL DEFAULT true,
@@ -30,12 +31,13 @@ CREATE TABLE IF NOT EXISTS tap_logs (
 CREATE INDEX IF NOT EXISTS idx_tap_logs_card_id ON tap_logs(card_id);
 CREATE INDEX IF NOT EXISTS idx_tap_logs_created_at ON tap_logs(created_at DESC);
 
--- 3. Internal Feedbacks Table (Stores complaints for 1-3 star ratings)
+-- 3. Internal Feedbacks Table (Stores all submitted 1-5 star reviews privately)
 CREATE TABLE IF NOT EXISTS internal_feedbacks (
     id BIGSERIAL PRIMARY KEY,
     card_id UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 3),
+    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
     feedback_text TEXT,
+    customer_whatsapp VARCHAR(30),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 

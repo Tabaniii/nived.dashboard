@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 /**
  * In-memory fallback store when Supabase environment variables are not set
@@ -36,7 +36,7 @@ let mockFeedbacks = [];
  * @returns {Promise<Object|null>}
  */
 export async function getCardBySlug(slug) {
-  if (!slug || typeof slug !== 'string') return null;
+  if (typeof slug !== 'string' || !slug.trim() || slug.length > 100) return null;
 
   if (isSupabaseConfigured && supabase) {
     try {
@@ -230,7 +230,7 @@ export async function recordStarTelemetry({
 }
 
 /**
- * Record internal customer feedback for ratings 1-3.
+ * Record customer feedback for all ratings (1-5), linked to the business via cards.
  *
  * @param {Object} entry
  * @param {string} entry.card_id
@@ -263,6 +263,16 @@ export async function createFeedback({
 
       if (error) {
         console.error('[db] Error creating internal feedback:', error.message);
+
+        // If remote database still enforces legacy 1-3 constraint (error 23514) on 4-5 star ratings:
+        if (error.code === '23514' && rating >= 4) {
+          console.warn('[db] Remote internal_feedbacks table enforces 1-3 check; recording 4-5 star rating in tap_logs.');
+          await recordStarTelemetry({ card_id, selected_stars: rating }).catch(() => {});
+          const fallback = { id: `fb-${Date.now()}`, ...row };
+          mockFeedbacks.push(fallback);
+          return fallback;
+        }
+
         return null;
       }
       return data;

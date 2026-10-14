@@ -1,11 +1,22 @@
+import Link from 'next/link';
+
 export default function FallbackView({ slug }) {
   return (
-    <main className="max-w-md mx-auto min-h-screen px-4 py-8 flex flex-col justify-center items-center bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <div className="w-full p-6 sm:p-8 bg-white dark:bg-zinc-900 rounded-3xl shadow-sm border border-zinc-200/80 dark:border-zinc-800 text-center">
-        {/* Friendly Reassurance Icon */}
-        <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50">
+    <main className="flex min-h-svh w-full flex-1 items-center justify-center bg-radial from-stone-50 via-[#f4f6f2] to-[#e8ece5] px-4 py-8 text-stone-900 sm:py-12">
+      <section
+        aria-labelledby="card-not-found-title"
+        className="relative w-full max-w-md overflow-hidden rounded-[2.25rem] border border-stone-200/90 bg-white/95 p-7 text-center shadow-[0_20px_60px_-25px_rgba(20,50,30,0.18)] backdrop-blur-md sm:p-9"
+      >
+        {/* Soft top gradient accent */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-12 left-1/2 h-24 w-48 -translate-x-1/2 rounded-full bg-linear-to-b from-amber-200/40 via-amber-100/20 to-transparent blur-xl"
+        />
+
+        {/* 404 Icon Badge */}
+        <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 shadow-xs ring-4 ring-amber-100/60 sm:h-20 sm:w-20 sm:rounded-3xl">
           <svg
-            className="w-8 h-8"
+            className="h-8 w-8 sm:h-10 sm:w-10"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -20,22 +31,37 @@ export default function FallbackView({ slug }) {
           </svg>
         </div>
 
-        {/* Heading */}
-        <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-2">
-          Card Not Found or Inactive
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-amber-800">
+          404 · Not Found
+        </span>
+
+        <h1
+          id="card-not-found-title"
+          className="mt-3 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl"
+        >
+          Card not registered
         </h1>
 
-        {/* Reassuring Description */}
-        <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
-          This physical card {slug ? `(${slug})` : ''} is currently not registered or has been deactivated.
-          Please ask the store staff for assistance.
+        <p className="mt-3 text-sm leading-6 text-stone-600">
+          This NFC card or link is not registered or currently unavailable.
+          Please ask a staff member for assistance to leave your review.
         </p>
 
-        {/* Footer info */}
-        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-400 dark:text-zinc-500">
-          NFC Reputation Shield
+        {slug && (
+          <div className="mt-6 rounded-xl border border-stone-200/80 bg-stone-50/90 p-3 text-left">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+              Card Slug / ID
+            </div>
+            <div className="mt-0.5 break-all font-mono text-xs font-medium text-emerald-900">
+              {slug}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-7 pt-4 border-t border-stone-100 text-xs text-stone-400">
+          Need help? Contact the business owner or counter staff directly.
         </div>
-      </div>
+      </section>
     </main>
   );
 }

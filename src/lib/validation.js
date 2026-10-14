@@ -23,6 +23,8 @@ export function isValidUUID(str) {
  * @returns {boolean}
  */
 export function isValidRating(rating, min = 1, max = 5) {
+  if (typeof rating !== 'number' && typeof rating !== 'string') return false;
+  if (typeof rating === 'string' && !rating.trim()) return false;
   const num = Number(rating);
   return Number.isInteger(num) && num >= min && num <= max;
 }
