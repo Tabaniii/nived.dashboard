@@ -24,7 +24,9 @@ export async function getClientCards(merchantId) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('cards')
-    .select('*')
+    .select(
+      'id, slug, store_name, google_review_url, whatsapp_number, is_shield_active, created_at'
+    )
     .eq('merchant_id', merchantId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true });
@@ -54,40 +56,62 @@ export async function getClientDashboardData(merchantId) {
   const startOfMonth = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1);
   const startOfRange = new Date(startOfToday);
   startOfRange.setDate(startOfRange.getDate() - 27);
+  const tapQueryStart = startOfMonth < startOfRange ? startOfMonth : startOfRange;
 
-  const { data: taps } = await supabase
-    .from('tap_logs')
-    .select('id, selected_stars, created_at, card_id')
-    .in('card_id', cardIds)
-    .gte('created_at', startOfRange.toISOString());
+  const [tapsResult, feedbacksResult, complaintsResult] = await Promise.all([
+    supabase
+      .from('tap_logs')
+      .select('id, selected_stars, created_at, card_id')
+      .in('card_id', cardIds)
+      .gte('created_at', tapQueryStart.toISOString()),
+    supabase
+      .from('internal_feedbacks')
+      .select(
+        'id, rating, feedback_text, customer_whatsapp, created_at, card_id, cards(store_name)'
+      )
+      .in('card_id', cardIds)
+      .order('created_at', { ascending: false })
+      .limit(100),
+    supabase
+      .from('internal_feedbacks')
+      .select('id', { count: 'exact', head: true })
+      .in('card_id', cardIds),
+  ]);
 
-  const { data: feedbacks } = await supabase
-    .from('internal_feedbacks')
-    .select('id, rating, feedback_text, customer_whatsapp, created_at, card_id, cards(store_name)')
-    .in('card_id', cardIds)
-    .order('created_at', { ascending: false })
-    .limit(100);
+  if (tapsResult.error) throw tapsResult.error;
+  if (feedbacksResult.error) throw feedbacksResult.error;
+  if (complaintsResult.error) throw complaintsResult.error;
 
-  const allTaps = taps || [];
+  const allTaps = tapsResult.data || [];
+  const feedbacks = feedbacksResult.data || [];
   const tapsToday = allTaps.filter((t) => new Date(t.created_at) >= startOfToday).length;
   const tapsMonth = allTaps.filter((t) => new Date(t.created_at) >= startOfMonth).length;
-  const positiveReviews = allTaps.filter(
-    (t) => t.selected_stars === 4 || t.selected_stars === 5
-  ).length;
-
-  const { count: shieldedComplaints } = await supabase
-    .from('internal_feedbacks')
-    .select('id', { count: 'exact', head: true })
-    .in('card_id', cardIds);
+  const positiveReviews = allTaps.filter((t) => {
+    const createdAt = new Date(t.created_at);
+    return (
+      createdAt >= startOfRange &&
+      (t.selected_stars === 4 || t.selected_stars === 5)
+    );
+  }).length;
 
   const dailyMap = new Map();
+  const weeklyMap = new Map();
   const hourMap = new Map(Array.from({ length: 24 }, (_, h) => [h, 0]));
 
   for (const tap of allTaps) {
     const d = new Date(tap.created_at);
-    const dayKey = d.toISOString().slice(0, 10);
-    dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + 1);
-    hourMap.set(d.getHours(), (hourMap.get(d.getHours()) || 0) + 1);
+    if (d >= startOfRange) {
+      const dayKey = d.toISOString().slice(0, 10);
+      dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + 1);
+      hourMap.set(d.getHours(), (hourMap.get(d.getHours()) || 0) + 1);
+    }
+
+    const tapDay = new Date(d);
+    tapDay.setHours(0, 0, 0, 0);
+    const weekIndex = Math.floor((startOfToday - tapDay) / (7 * 86400000));
+    if (weekIndex >= 0 && weekIndex < 4) {
+      weeklyMap.set(weekIndex, (weeklyMap.get(weekIndex) || 0) + 1);
+    }
   }
 
   const daily = [];
@@ -104,13 +128,9 @@ export async function getClientDashboardData(merchantId) {
     end.setDate(end.getDate() - w * 7);
     const start = new Date(end);
     start.setDate(start.getDate() - 6);
-    const count = allTaps.filter((t) => {
-      const ts = new Date(t.created_at);
-      return ts >= start && ts <= new Date(end.getTime() + 86400000 - 1);
-    }).length;
     weekly.push({
       week: `${start.toISOString().slice(5, 10)}–${end.toISOString().slice(5, 10)}`,
-      count,
+      count: weeklyMap.get(w) || 0,
     });
   }
 
@@ -125,11 +145,11 @@ export async function getClientDashboardData(merchantId) {
       tapsToday,
       tapsMonth,
       positiveReviews,
-      shieldedComplaints: shieldedComplaints || 0,
+      shieldedComplaints: complaintsResult.count || 0,
     },
     daily,
     weekly,
     peakHours,
-    feedbacks: feedbacks || [],
+    feedbacks,
   };
 }

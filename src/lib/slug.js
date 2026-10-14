@@ -22,17 +22,37 @@ export function buildCardSlug(storeName, seq = 1) {
   return `${base}-${suffix}`;
 }
 
-export function getAppBaseUrl() {
+export function getAppBaseUrl(explicitBaseUrl) {
   const base =
+    explicitBaseUrl ||
     process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-    'http://localhost:3000';
-  return base.replace(/\/$/, '');
+    (typeof window !== 'undefined' ? window.location.origin : null);
+
+  if (!base) {
+    if (process.env.NODE_ENV === 'development') {
+      return 'http://localhost:3000';
+    }
+
+    throw new Error(
+      'Missing NEXT_PUBLIC_APP_URL. Set it to the staging or production origin before provisioning cards.'
+    );
+  }
+
+  const normalized = base.replace(/\/$/, '');
+  const parsed = new URL(normalized);
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('App URL must use http or https.');
+  }
+
+  return normalized;
 }
 
 /**
  * @param {string} slug
+ * @param {string} [baseUrl]
  */
-export function cardPublicUrl(slug) {
-  return `${getAppBaseUrl()}/r/${slug}`;
+export function cardPublicUrl(slug, baseUrl) {
+  return `${getAppBaseUrl(baseUrl)}/r/${slug}`;
 }

@@ -21,6 +21,7 @@ export default function ProvisionCardForm({ merchants }) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    formData.set('base_url', window.location.origin);
     setError(null);
 
     startTransition(async () => {

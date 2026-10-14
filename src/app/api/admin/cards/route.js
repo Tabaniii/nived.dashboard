@@ -51,7 +51,7 @@ export async function POST(request) {
       : 'true'
   );
 
-  const result = await provisionCardAction(formData);
+  const result = await provisionCardAction(formData, new URL(request.url).origin);
   if (result?.error) {
     const status = result.error === 'Unauthorized' ? 401 : 400;
     return NextResponse.json({ error: result.error }, { status });

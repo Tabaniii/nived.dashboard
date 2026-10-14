@@ -91,8 +91,9 @@ export async function provisionMerchantAction(formData) {
 
 /**
  * @param {FormData} formData
+ * @param {string} [baseUrl]
  */
-export async function provisionCardAction(formData) {
+export async function provisionCardAction(formData, baseUrl) {
   const auth = await assertAdmin();
   if (auth.error) return auth;
   const admin = createAdminClient();
@@ -101,6 +102,7 @@ export async function provisionCardAction(formData) {
   const storeName = String(formData.get('store_name') || '').trim();
   const googleReviewUrl = String(formData.get('google_review_url') || '').trim();
   const whatsappNumber = String(formData.get('whatsapp_number') || '').trim();
+  const requestBaseUrl = String(formData.get('base_url') || '').trim() || baseUrl;
   const isShieldActive = formData.get('is_shield_active') !== 'false';
 
   if (!merchantId || !storeName || !googleReviewUrl) {
@@ -151,7 +153,7 @@ export async function provisionCardAction(formData) {
   return {
     success: true,
     card,
-    publicUrl: cardPublicUrl(card.slug),
+    publicUrl: cardPublicUrl(card.slug, requestBaseUrl),
   };
 }
 
