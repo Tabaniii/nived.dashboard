@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { sanitizeReviewUrl } from '@/lib/validation';
 import { getClientContext } from './queries';
 
 /**
@@ -14,12 +15,17 @@ export async function updateCardSettingsAction(formData) {
   }
 
   const cardId = String(formData.get('card_id') || '').trim();
-  const googleReviewUrl = String(formData.get('google_review_url') || '').trim();
+  const rawGoogleReviewUrl = String(formData.get('google_review_url') || '').trim();
   const whatsappNumber = String(formData.get('whatsapp_number') || '').trim();
   const storeName = String(formData.get('store_name') || '').trim();
 
-  if (!cardId || !googleReviewUrl) {
+  if (!cardId || !rawGoogleReviewUrl) {
     return { error: 'Card dan Google Review URL wajib.' };
+  }
+
+  const googleReviewUrl = sanitizeReviewUrl(rawGoogleReviewUrl);
+  if (!googleReviewUrl) {
+    return { error: 'Google Review URL harus berupa URL yang valid (contoh: https://g.page/r/.../review).' };
   }
 
   const supabase = await createClient();

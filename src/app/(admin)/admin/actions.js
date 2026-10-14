@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireRole } from '@/lib/auth/session';
 import { buildCardSlug, cardPublicUrl } from '@/lib/slug';
 import { generateTempPassword } from '@/lib/password';
+import { sanitizeReviewUrl } from '@/lib/validation';
 
 async function assertAdmin() {
   const session = await requireRole('admin');
@@ -100,13 +101,17 @@ export async function provisionCardAction(formData, baseUrl) {
 
   const merchantId = String(formData.get('merchant_id') || '').trim();
   const storeName = String(formData.get('store_name') || '').trim();
-  const googleReviewUrl = String(formData.get('google_review_url') || '').trim();
+  const rawGoogleReviewUrl = String(formData.get('google_review_url') || '').trim();
   const whatsappNumber = String(formData.get('whatsapp_number') || '').trim();
-  const requestBaseUrl = String(formData.get('base_url') || '').trim() || baseUrl;
   const isShieldActive = formData.get('is_shield_active') !== 'false';
 
-  if (!merchantId || !storeName || !googleReviewUrl) {
+  if (!merchantId || !storeName || !rawGoogleReviewUrl) {
     return { error: 'Merchant, nama toko, dan Google Review URL wajib.' };
+  }
+
+  const googleReviewUrl = sanitizeReviewUrl(rawGoogleReviewUrl);
+  if (!googleReviewUrl) {
+    return { error: 'Google Review URL harus berupa URL yang valid (contoh: https://g.page/r/.../review).' };
   }
 
   const { count } = await admin
@@ -153,7 +158,7 @@ export async function provisionCardAction(formData, baseUrl) {
   return {
     success: true,
     card,
-    publicUrl: cardPublicUrl(card.slug, requestBaseUrl),
+    publicUrl: cardPublicUrl(card.slug),
   };
 }
 

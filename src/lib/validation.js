@@ -46,3 +46,40 @@ export function sanitizeText(text = '', maxLength = 2000) {
     .trim()
     .slice(0, maxLength);
 }
+
+/**
+ * Validates and sanitizes a Google Review / destination URL.
+ * Preserves query parameters (such as ?placeid=... or review triggers)
+ * and fragments, strips auth credentials, and rejects non-http(s) schemes.
+ *
+ * @param {string} [urlString='']
+ * @returns {string|null} Sanitized URL string or null if invalid
+ */
+export function sanitizeReviewUrl(urlString = '') {
+  if (typeof urlString !== 'string') return null;
+  const trimmed = urlString.trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return null;
+    }
+    // Strip user/password credentials to prevent credential injection
+    parsed.username = '';
+    parsed.password = '';
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks whether a string is a valid review destination URL.
+ *
+ * @param {string} urlString
+ * @returns {boolean}
+ */
+export function isValidReviewUrl(urlString) {
+  return sanitizeReviewUrl(urlString) !== null;
+}

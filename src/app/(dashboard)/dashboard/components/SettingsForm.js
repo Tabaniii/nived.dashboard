@@ -161,7 +161,7 @@ export default function SettingsForm({ cards = [] }) {
         <div className="space-y-1.5">
           <label htmlFor="google_review_url" className="flex items-center gap-1.5 text-xs font-medium text-zinc-300">
             <MapPin className="size-3.5 text-zinc-500" />
-            <span>Google Maps Review URL</span>
+            <span>Google Review URL</span>
           </label>
           <input
             id="google_review_url"
@@ -171,10 +171,10 @@ export default function SettingsForm({ cards = [] }) {
             required
             defaultValue={selected.google_review_url}
             className={fieldClass}
-            placeholder="https://maps.app.goo.gl/..."
+            placeholder="https://g.page/r/XXXXX/review"
           />
-          <p className="text-[11px] text-zinc-500">
-            Tautan tujuan redirect untuk pelanggan yang memberikan rating 4 atau 5 bintang.
+          <p className="text-[11px] text-zinc-400">
+            Provide your Google Business Profile direct review intent URL so customers see the rating modal immediately upon opening.
           </p>
         </div>
 

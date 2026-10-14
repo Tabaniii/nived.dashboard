@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react';
 import QRCode from 'qrcode';
 import { CreditCard, QrCode, Copy, Check, Download, ExternalLink, ShieldCheck, Store, Phone, MapPin, Loader2 } from 'lucide-react';
 import { provisionCardAction } from '../actions';
+import { getBaseUrl } from '@/lib/url';
 
 const fieldClass =
   'w-full rounded-xl border border-zinc-800 bg-zinc-950/80 px-3.5 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition-all';
@@ -21,7 +22,6 @@ export default function ProvisionCardForm({ merchants }) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    formData.set('base_url', window.location.origin);
     setError(null);
 
     startTransition(async () => {
@@ -32,8 +32,9 @@ export default function ProvisionCardForm({ merchants }) {
         setQrDataUrl(null);
         return;
       }
-      setResult(res);
-      const dataUrl = await QRCode.toDataURL(res.publicUrl, {
+      const canonicalUrl = res.publicUrl || `${getBaseUrl()}/r/${res.card.slug}`;
+      setResult({ ...res, publicUrl: canonicalUrl });
+      const dataUrl = await QRCode.toDataURL(canonicalUrl, {
         width: 320,
         margin: 2,
         color: { dark: '#09090b', light: '#ffffff' },
@@ -119,8 +120,11 @@ export default function ProvisionCardForm({ merchants }) {
             type="url"
             required
             className={fieldClass}
-            placeholder="https://maps.app.goo.gl/..."
+            placeholder="https://g.page/r/XXXXX/review"
           />
+          <p className="text-[11px] text-zinc-400">
+            Provide your Google Business Profile direct review intent URL so customers see the rating modal immediately upon opening.
+          </p>
         </div>
 
         <div className="sm:col-span-2">

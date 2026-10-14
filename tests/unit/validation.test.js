@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isValidUUID, isValidRating, sanitizeText } from '@/lib/validation';
+import { isValidUUID, isValidRating, sanitizeText, sanitizeReviewUrl, isValidReviewUrl } from '@/lib/validation';
 
 describe('Validation Utilities', () => {
   describe('isValidUUID', () => {
@@ -51,6 +51,41 @@ describe('Validation Utilities', () => {
     it('handles non-string values gracefully', () => {
       expect(sanitizeText(null)).toBe('');
       expect(sanitizeText(undefined)).toBe('');
+    });
+  });
+
+  describe('sanitizeReviewUrl & isValidReviewUrl', () => {
+    it('accepts and sanitizes Google Business Profile direct review URLs', () => {
+      const gPage = 'https://g.page/r/Cd12345/review';
+      expect(isValidReviewUrl(gPage)).toBe(true);
+      expect(sanitizeReviewUrl(gPage)).toBe(gPage);
+
+      const writeReview = 'https://search.google.com/local/writereview?placeid=ChIJ1234567890';
+      expect(isValidReviewUrl(writeReview)).toBe(true);
+      expect(sanitizeReviewUrl(writeReview)).toBe(writeReview);
+
+      const mapsApp = 'https://maps.app.goo.gl/abcdef';
+      expect(isValidReviewUrl(mapsApp)).toBe(true);
+      expect(sanitizeReviewUrl(mapsApp)).toBe(mapsApp);
+    });
+
+    it('preserves query parameters and hashes', () => {
+      const urlWithQuery = 'https://search.google.com/local/writereview?placeid=ChIJ123&utm_source=nfc#top';
+      expect(sanitizeReviewUrl(urlWithQuery)).toBe(urlWithQuery);
+    });
+
+    it('strips credentials embedded in URL', () => {
+      const urlWithCreds = 'https://user:secret@g.page/r/Cd12345/review';
+      expect(sanitizeReviewUrl(urlWithCreds)).toBe('https://g.page/r/Cd12345/review');
+    });
+
+    it('rejects invalid schemes and non-URLs', () => {
+      expect(isValidReviewUrl('javascript:alert(1)')).toBe(false);
+      expect(sanitizeReviewUrl('javascript:alert(1)')).toBeNull();
+      expect(isValidReviewUrl('not-a-url')).toBe(false);
+      expect(isValidReviewUrl('')).toBe(false);
+      expect(isValidReviewUrl(null)).toBe(false);
+      expect(isValidReviewUrl(undefined)).toBe(false);
     });
   });
 });

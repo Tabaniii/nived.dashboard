@@ -80,12 +80,22 @@ export default function RatingClientView({ card }) {
   const [submitError, setSubmitError] = useState('');
   const [clipboardStatus, setClipboardStatus] = useState('idle'); // 'idle' | 'copied' | 'copying' | 'manual'
   const [logoFailed, setLogoFailed] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const submittingRef = useRef(false);
   const confirmationRef = useRef(null);
   const reviewTextRef = useRef(null);
+  const redirectTimeoutRef = useRef(null);
 
   const storeName = card?.store_name || 'Our Business';
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (savedReview) {
@@ -109,10 +119,18 @@ export default function RatingClientView({ card }) {
   };
 
   const handleRatingChange = (star) => {
-    if (submittingRef.current || savedReview) return;
+    if (submittingRef.current || savedReview || isRedirecting) return;
     setSelectedRating(star);
     setSubmitError('');
     recordStarTelemetry(card?.id, star);
+
+    // If 4 or 5 stars and destination URL is configured, trigger smooth redirect
+    if (star >= 4 && card?.google_review_url) {
+      setIsRedirecting(true);
+      redirectTimeoutRef.current = setTimeout(() => {
+        window.location.href = card.google_review_url;
+      }, 400);
+    }
   };
 
   const handleFeedbackSubmit = async (event) => {
@@ -248,7 +266,46 @@ export default function RatingClientView({ card }) {
         </header>
 
         {/* Confirmation Screens vs Rating Form */}
-        {savedReview ? (
+        {isRedirecting ? (
+          <section
+            className="px-6 py-8 text-center sm:px-8 transition-all animate-in fade-in duration-200"
+            aria-live="polite"
+          >
+            <div className="space-y-6">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-50 text-amber-500 shadow-sm ring-4 ring-amber-100/70 scale-105 transition-transform">
+                <StarIcon className="h-9 w-9 animate-pulse" filled={true} />
+              </div>
+
+              <div>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-600/20">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                  {selectedRating} of 5 Stars · Exceptional!
+                </span>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-stone-900">
+                  Opening Google Reviews…
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  Thank you for rating {storeName}! We are redirecting you to share your experience directly on Google.
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <a
+                  href={card?.google_review_url}
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-900 px-5 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-emerald-800 transition"
+                >
+                  <span>Continue to Google Reviews</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M7 7h10v10" />
+                  </svg>
+                </a>
+                <p className="mt-2 text-[11px] text-stone-400">
+                  Tap above if you are not automatically redirected.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : savedReview ? (
           <section
             className="px-6 py-8 text-center sm:px-8 transition-all"
             aria-labelledby="confirmation-title"
@@ -554,8 +611,8 @@ export default function RatingClientView({ card }) {
                 </div>
               )}
 
-              {/* Submit Review Button */}
-              <div className="mt-6">
+              {/* Submit Review Button & WhatsApp Escalation */}
+              <div className="mt-6 space-y-2.5">
                 <button
                   type="submit"
                   disabled={!selectedRating || isSubmitting}
@@ -567,12 +624,26 @@ export default function RatingClientView({ card }) {
                         aria-hidden="true"
                         className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
                       />
-                      <span>Submitting Review…</span>
+                      <span>Submitting Feedback…</span>
                     </>
                   ) : (
-                    <span>Submit Review</span>
+                    <span>{selectedRating <= 3 ? 'Submit Private Feedback' : 'Submit Review'}</span>
                   )}
                 </button>
+
+                {waUrl && selectedRating <= 3 && (
+                  <a
+                    href={waUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-xs font-semibold text-white shadow-xs hover:bg-[#20bd5a] transition-colors"
+                  >
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.43 0-2.82-.37-4.05-1.08l-.29-.17-3.12.82.83-3.04-.19-.3a8.214 8.214 0 0 1-1.26-4.46c0-4.54 3.7-8.24 8.24-8.24m4.52 11.63c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.41-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.38-.44.12-.14.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.35-.77-1.85-.2-.49-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.78 2.72 4.31 3.81.6.26 1.07.42 1.44.53.61.2 1.16.17 1.6.11.49-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.15-1.18-.06-.1-.23-.17-.48-.29" />
+                    </svg>
+                    <span>Chat Directly with Manager on WhatsApp</span>
+                  </a>
+                )}
               </div>
 
               <p className="mt-4 text-center text-[11px] text-stone-400">

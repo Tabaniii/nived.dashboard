@@ -41,6 +41,7 @@ export async function logTapAsync({
  * @param {string} params.cardId
  * @param {string} [params.clientIp='']
  * @param {string} [params.userAgent='']
+ * @param {string} [params.referrer='']
  * @param {number} [params.selectedStars]
  * @returns {Promise<Object|null>|null}
  */
@@ -48,13 +49,14 @@ export function queueTapTelemetry({
   cardId,
   clientIp = '',
   userAgent = '',
+  referrer = '',
   selectedStars = null,
 }) {
-  if (!shouldLogTap(cardId, clientIp, userAgent)) {
+  if (!shouldLogTap(cardId, clientIp, userAgent, { referrer })) {
     return null; // Suppressed by < 5-second anti-spam debounce
   }
 
-  const os = parseDeviceOS(userAgent);
+  const os = parseDeviceOS(userAgent, { includeDesktop: true });
   const ipHash = hashIp(clientIp);
 
   return logTapAsync({
@@ -74,6 +76,7 @@ export function queueTapTelemetry({
  * @param {string} params.cardId
  * @param {string} [params.clientIp='']
  * @param {string} [params.userAgent='']
+ * @param {string} [params.referrer='']
  * @param {number} [params.selectedStars]
  * @returns {boolean} true if tap was accepted and queued for logging, false if debounced
  */
@@ -81,12 +84,14 @@ export function handleTapTelemetry({
   cardId,
   clientIp = '',
   userAgent = '',
+  referrer = '',
   selectedStars = null,
 }) {
   const pending = queueTapTelemetry({
     cardId,
     clientIp,
     userAgent,
+    referrer,
     selectedStars,
   });
 

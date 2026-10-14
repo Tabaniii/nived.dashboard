@@ -1,3 +1,7 @@
+import { getBaseUrl } from './url';
+
+export { getBaseUrl };
+
 /**
  * @param {string} input
  * @returns {string}
@@ -23,30 +27,20 @@ export function buildCardSlug(storeName, seq = 1) {
 }
 
 export function getAppBaseUrl(explicitBaseUrl) {
-  const base =
-    explicitBaseUrl ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-    (typeof window !== 'undefined' ? window.location.origin : null);
-
-  if (!base) {
-    if (process.env.NODE_ENV === 'development') {
-      return 'http://localhost:3000';
+  if (explicitBaseUrl) {
+    const normalized = explicitBaseUrl.replace(/\/$/, '');
+    try {
+      const parsed = new URL(normalized);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('App URL must use http or https.');
+      }
+      return normalized;
+    } catch {
+      return normalized;
     }
-
-    throw new Error(
-      'Missing NEXT_PUBLIC_APP_URL. Set it to the staging or production origin before provisioning cards.'
-    );
   }
 
-  const normalized = base.replace(/\/$/, '');
-  const parsed = new URL(normalized);
-  if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error('App URL must use http or https.');
-  }
-
-  return normalized;
+  return getBaseUrl();
 }
 
 /**

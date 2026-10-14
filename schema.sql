@@ -9,11 +9,15 @@ CREATE TABLE IF NOT EXISTS cards (
     slug VARCHAR(100) UNIQUE NOT NULL,
     store_name VARCHAR(255) NOT NULL,
     logo_url TEXT,
+    -- Destination field: Google Business Profile direct review intent URL
+    -- Examples: https://g.page/r/XXXXX/review or https://search.google.com/local/writereview?placeid=XXXXX
     google_review_url TEXT NOT NULL,
     whatsapp_number VARCHAR(30),
     is_shield_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
+
+COMMENT ON COLUMN cards.google_review_url IS 'Provide your Google Business Profile direct review intent URL so customers see the rating modal immediately upon opening.';
 
 CREATE INDEX IF NOT EXISTS idx_cards_slug ON cards(slug);
 

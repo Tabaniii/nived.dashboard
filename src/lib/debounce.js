@@ -31,15 +31,25 @@ export function hashIp(clientIp = '') {
  * @param {string} cardId
  * @param {string} clientIp
  * @param {string} userAgent
- * @param {number} [customNow] Optional timestamp override (used in unit tests)
+ * @param {number|{ customNow?: number, referrer?: string }} [customNowOrOptions] Optional timestamp override or options
  * @returns {boolean} true if tap should be logged, false if debounced
  */
-export function shouldLogTap(cardId, clientIp, userAgent, customNow) {
+export function shouldLogTap(cardId, clientIp, userAgent, customNowOrOptions) {
   if (!cardId) return false;
+
+  let customNow;
+  let referrer = '';
+  if (typeof customNowOrOptions === 'number') {
+    customNow = customNowOrOptions;
+  } else if (customNowOrOptions && typeof customNowOrOptions === 'object') {
+    customNow = customNowOrOptions.customNow;
+    referrer = customNowOrOptions.referrer || '';
+  }
 
   const ip = clientIp || 'unknown-ip';
   const ua = userAgent || 'unknown-ua';
-  const key = `${cardId}:${ip}:${ua}`;
+  const refKey = referrer ? `:${referrer}` : '';
+  const key = `${cardId}:${ip}:${ua}${refKey}`;
   const now = typeof customNow === 'number' ? customNow : Date.now();
 
   const lastTap = tapDebounceMap.get(key);

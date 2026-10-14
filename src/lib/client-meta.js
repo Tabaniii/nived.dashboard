@@ -7,11 +7,12 @@
  */
 export function getClientMeta(headerList) {
   const userAgent = headerList.get('user-agent') || '';
+  const referrer = headerList.get('referer') || headerList.get('referrer') || '';
   const forwarded = headerList.get('x-forwarded-for');
   const clientIp =
     (forwarded ? forwarded.split(',')[0]?.trim() : '') ||
     headerList.get('x-real-ip') ||
     '';
 
-  return { clientIp, userAgent };
+  return { clientIp, userAgent, referrer };
 }

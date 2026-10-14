@@ -58,7 +58,16 @@ export default function FallbackView({ slug }) {
           </div>
         )}
 
-        <div className="mt-7 pt-4 border-t border-stone-100 text-xs text-stone-400">
+        <div className="mt-6">
+          <Link
+            href="https://nived.studio"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-800 transition"
+          >
+            Visit Nived Studio
+          </Link>
+        </div>
+
+        <div className="mt-6 pt-4 border-t border-stone-100 text-xs text-stone-400">
           Need help? Contact the business owner or counter staff directly.
         </div>
       </section>
