@@ -1,0 +1,25 @@
+orchestrator:
+  enabled: true
+  strategy: router # atau 'consensus' / 'pipeline'
+  primary_evaluator: cursor # model acuan untuk membagi task
+
+agents:
+  codex:
+    type: cli
+    command: codex
+    capabilities: [code_generation, refactor]
+
+  cursor:
+    type: cli
+    command: cursor
+    capabilities: [workspace_edit, navigation]
+
+  antigravity:
+    type: cli
+    command: antigravity
+    capabilities: [automation, system_tasks]
+
+  copilot:
+    type: cli
+    command: copilot
+    capabilities: [code_review, completion]
