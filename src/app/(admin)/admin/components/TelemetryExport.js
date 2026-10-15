@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, FileJson, FileSpreadsheet, Check } from 'lucide-react';
+import { FileJson, FileSpreadsheet, Check } from 'lucide-react';
 
 function downloadBlob(filename, content, type) {
   const blob = new Blob([content], { type });
@@ -89,43 +89,34 @@ export default function TelemetryExport({ taps = [], feedbacks = [] }) {
     setTimeout(() => setDownloading(null), 1500);
   };
 
+  const btnClass =
+    'flex items-center gap-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/90 px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white cursor-pointer shadow-xs';
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={handleExportJson}
-        className="flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800 hover:text-white cursor-pointer shadow-xs"
-      >
+      <button type="button" onClick={handleExportJson} className={btnClass}>
         {downloading === 'json' ? (
-          <Check className="size-3.5 text-emerald-400" />
+          <Check className="size-3.5 text-brand-600 dark:text-brand-400" />
         ) : (
-          <FileJson className="size-3.5 text-emerald-400" />
+          <FileJson className="size-3.5 text-brand-600 dark:text-brand-400" />
         )}
         <span>Export JSON (Dataset)</span>
       </button>
 
-      <button
-        type="button"
-        onClick={handleExportTapsCsv}
-        className="flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800 hover:text-white cursor-pointer shadow-xs"
-      >
+      <button type="button" onClick={handleExportTapsCsv} className={btnClass}>
         {downloading === 'taps-csv' ? (
-          <Check className="size-3.5 text-emerald-400" />
+          <Check className="size-3.5 text-brand-600 dark:text-brand-400" />
         ) : (
-          <FileSpreadsheet className="size-3.5 text-sky-400" />
+          <FileSpreadsheet className="size-3.5 text-sky-600 dark:text-sky-400" />
         )}
         <span>Export Taps CSV</span>
       </button>
 
-      <button
-        type="button"
-        onClick={handleExportFeedbacksCsv}
-        className="flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900/90 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800 hover:text-white cursor-pointer shadow-xs"
-      >
+      <button type="button" onClick={handleExportFeedbacksCsv} className={btnClass}>
         {downloading === 'feedbacks-csv' ? (
-          <Check className="size-3.5 text-emerald-400" />
+          <Check className="size-3.5 text-brand-600 dark:text-brand-400" />
         ) : (
-          <FileSpreadsheet className="size-3.5 text-amber-400" />
+          <FileSpreadsheet className="size-3.5 text-amber-500 dark:text-amber-400" />
         )}
         <span>Export Feedback CSV</span>
       </button>

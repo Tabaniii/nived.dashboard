@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Star, Smartphone, MessageSquare, PhoneCall, Radio, Filter } from 'lucide-react';
+import { Search, Star, Smartphone, MessageSquare, PhoneCall, Radio } from 'lucide-react';
 import TelemetryExport from './TelemetryExport';
 
 export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
@@ -33,11 +33,11 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
   const getDeviceBadge = (os) => {
     switch (os) {
       case 'iOS':
-        return 'border-blue-500/30 bg-blue-500/10 text-blue-400';
+        return 'border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400';
       case 'Android':
-        return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
+        return 'border-brand-500/30 bg-brand-500/10 text-brand-700 dark:text-brand-400';
       default:
-        return 'border-zinc-700 bg-zinc-800 text-zinc-400';
+        return 'border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400';
     }
   };
 
@@ -46,7 +46,7 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
       {/* Top Header with Exports */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400 dark:text-zinc-500">
             <Search className="size-3.5" />
           </div>
           <input
@@ -54,7 +54,7 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari toko, slug, OS, atau masukan..."
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-900/60 py-2 pl-8 pr-3 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+            className="w-full rounded-xl border border-zinc-300 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 py-2 pl-8 pr-3 text-xs text-zinc-900 dark:text-zinc-100 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-brand-500/60 focus:ring-2 focus:ring-brand-500/20 transition-all"
           />
         </div>
 
@@ -62,14 +62,14 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
       </div>
 
       {/* View Switcher Tabs */}
-      <div className="flex items-center gap-1.5 border-b border-zinc-800 pb-2">
+      <div className="flex items-center gap-1.5 border-b border-zinc-200 dark:border-zinc-800 pb-2">
         <button
           type="button"
           onClick={() => setTab('taps')}
           className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition cursor-pointer border ${
             tab === 'taps'
-              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-              : 'border-transparent text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
+              ? 'border-brand-500/40 bg-brand-500/10 text-brand-700 dark:text-brand-300 shadow-xs'
+              : 'border-transparent text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200'
           }`}
         >
           <Radio className="size-3.5" />
@@ -81,8 +81,8 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
           onClick={() => setTab('feedbacks')}
           className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition cursor-pointer border ${
             tab === 'feedbacks'
-              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-              : 'border-transparent text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
+              ? 'border-brand-500/40 bg-brand-500/10 text-brand-700 dark:text-brand-300 shadow-xs'
+              : 'border-transparent text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200'
           }`}
         >
           <MessageSquare className="size-3.5" />
@@ -94,7 +94,7 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
       {tab === 'taps' && (
         <section className="space-y-3">
           {filteredTaps.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-8 text-center text-xs text-zinc-500">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40 p-8 text-center text-xs text-zinc-500 shadow-xs">
               Tidak ada data tap log yang sesuai kriteria pencarian.
             </div>
           ) : (
@@ -104,10 +104,10 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
                 {filteredTaps.map((t) => (
                   <div
                     key={t.id}
-                    className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-4 shadow-sm space-y-2.5"
+                    className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-4 shadow-xs space-y-2.5"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-xs text-zinc-100">
+                      <span className="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
                         {t.cards?.store_name || t.cards?.slug || 'Kartu'}
                       </span>
                       <span className="text-[10px] text-zinc-500 font-mono">
@@ -129,12 +129,12 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
                       </span>
 
                       {t.selected_stars != null ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-500 dark:text-amber-400 border border-amber-500/20">
                           <Star className="size-2.5 fill-current" />
                           <span>{t.selected_stars} Bintang</span>
                         </span>
                       ) : (
-                        <span className="text-[10px] text-zinc-500 italic">Initial Tap</span>
+                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 italic">Initial Tap</span>
                       )}
                     </div>
 
@@ -146,9 +146,9 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
               </div>
 
               {/* Desktop Table View (>= 768px) */}
-              <div className="hidden md:block overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/40 shadow-sm">
+              <div className="hidden md:block overflow-hidden rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40 shadow-xs">
                 <table className="min-w-full text-left text-sm" aria-label="Tabel Telemetri Tap Logs">
-                  <thead className="border-b border-zinc-800 bg-zinc-900/90 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                  <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/90 dark:bg-zinc-900/90 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     <tr>
                       <th scope="col" className="px-4 py-3.5">Waktu</th>
                       <th scope="col" className="px-4 py-3.5">Toko / Kartu</th>
@@ -157,16 +157,16 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
                       <th scope="col" className="px-4 py-3.5">User-Agent</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/80">
+                  <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800/80">
                     {filteredTaps.map((t) => (
-                      <tr key={t.id} className="transition hover:bg-zinc-800/30">
-                        <td className="px-4 py-3.5 whitespace-nowrap text-xs text-zinc-400 font-mono">
+                      <tr key={t.id} className="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30">
+                        <td className="px-4 py-3.5 whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400 font-mono">
                           {new Date(t.created_at).toLocaleString('id-ID', {
                             dateStyle: 'medium',
                             timeStyle: 'medium',
                           })}
                         </td>
-                        <td className="px-4 py-3.5 font-medium text-zinc-200">
+                        <td className="px-4 py-3.5 font-medium text-zinc-900 dark:text-zinc-200">
                           {t.cards?.store_name || t.cards?.slug}
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
@@ -181,12 +181,12 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
                         </td>
                         <td className="px-4 py-3.5 text-center whitespace-nowrap">
                           {t.selected_stars != null ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/20">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-500 dark:text-amber-400 border border-amber-500/20">
                               <Star className="size-3 fill-current" />
                               <span>{t.selected_stars}★</span>
                             </span>
                           ) : (
-                            <span className="text-xs text-zinc-600">—</span>
+                            <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
                           )}
                         </td>
                         <td className="max-w-md truncate px-4 py-3.5 text-xs font-mono text-zinc-500" title={t.user_agent}>
@@ -206,7 +206,7 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
       {tab === 'feedbacks' && (
         <section className="space-y-3">
           {filteredFeedbacks.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-8 text-center text-xs text-zinc-500">
+            <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40 p-8 text-center text-xs text-zinc-500 shadow-xs">
               Tidak ada data keluhan pelanggan yang cocok dengan pencarian.
             </div>
           ) : (
@@ -219,15 +219,15 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
                   return (
                     <div
                       key={f.id}
-                      className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-4 shadow-sm space-y-3"
+                      className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-4 shadow-xs space-y-3"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5">
-                          <span className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/20">
+                          <span className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-500 dark:text-amber-400 border border-amber-500/20">
                             <Star className="size-3 fill-current" />
                             {f.rating}/5
                           </span>
-                          <span className="text-xs font-medium text-zinc-200">
+                          <span className="text-xs font-medium text-zinc-900 dark:text-zinc-200">
                             {f.cards?.store_name || f.cards?.slug}
                           </span>
                         </div>
@@ -239,17 +239,17 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
                         </span>
                       </div>
 
-                      <p className="text-xs text-zinc-300 bg-zinc-950/60 p-3 rounded-xl border border-zinc-800/50">
+                      <p className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-950/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/50">
                         {f.feedback_text ? (
                           `"${f.feedback_text}"`
                         ) : (
-                          <span className="italic text-zinc-500">Tidak ada pesan tertulis</span>
+                          <span className="italic text-zinc-400 dark:text-zinc-500">Tidak ada pesan tertulis</span>
                         )}
                       </p>
 
                       {cleanPhone ? (
                         <div className="flex items-center justify-between pt-1">
-                          <span className="text-[11px] text-zinc-400 font-mono">+{cleanPhone}</span>
+                          <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-mono">+{cleanPhone}</span>
                           <a
                             href={`https://wa.me/${cleanPhone}`}
                             target="_blank"
@@ -267,9 +267,9 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
               </div>
 
               {/* Desktop Table View (>= 768px) */}
-              <div className="hidden md:block overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/40 shadow-sm">
+              <div className="hidden md:block overflow-hidden rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40 shadow-xs">
                 <table className="min-w-full text-left text-sm" aria-label="Tabel Keluhan Pelanggan">
-                  <thead className="border-b border-zinc-800 bg-zinc-900/90 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                  <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/90 dark:bg-zinc-900/90 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     <tr>
                       <th scope="col" className="px-4 py-3.5">Waktu</th>
                       <th scope="col" className="px-4 py-3.5">Toko</th>
@@ -278,32 +278,32 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
                       <th scope="col" className="px-4 py-3.5 text-right">No. WhatsApp</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/80">
+                  <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800/80">
                     {filteredFeedbacks.map((f) => {
                       const cleanPhone = f.customer_whatsapp?.replace(/\D/g, '');
 
                       return (
-                        <tr key={f.id} className="transition hover:bg-zinc-800/30">
-                          <td className="px-4 py-3.5 text-xs text-zinc-400 font-mono whitespace-nowrap">
+                        <tr key={f.id} className="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30">
+                          <td className="px-4 py-3.5 text-xs text-zinc-500 dark:text-zinc-400 font-mono whitespace-nowrap">
                             {new Date(f.created_at).toLocaleString('id-ID', {
                               dateStyle: 'medium',
                               timeStyle: 'medium',
                             })}
                           </td>
-                          <td className="px-4 py-3.5 font-medium text-zinc-200">
+                          <td className="px-4 py-3.5 font-medium text-zinc-900 dark:text-zinc-200">
                             {f.cards?.store_name || f.cards?.slug}
                           </td>
                           <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/20">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-500 dark:text-amber-400 border border-amber-500/20">
                               <Star className="size-3 fill-current" />
                               <span>{f.rating}/5</span>
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 max-w-md text-xs text-zinc-300">
+                          <td className="px-4 py-3.5 max-w-md text-xs text-zinc-700 dark:text-zinc-300">
                             {f.feedback_text ? (
                               <span>{f.feedback_text}</span>
                             ) : (
-                              <span className="italic text-zinc-500">Tidak ada pesan tertulis</span>
+                              <span className="italic text-zinc-400 dark:text-zinc-500">Tidak ada pesan tertulis</span>
                             )}
                           </td>
                           <td className="px-4 py-3.5 text-right whitespace-nowrap font-mono text-xs">
@@ -318,7 +318,7 @@ export default function TelemetryViewer({ taps = [], feedbacks = [] }) {
                                 <span>+{cleanPhone}</span>
                               </a>
                             ) : (
-                              <span className="text-zinc-600">—</span>
+                              <span className="text-zinc-400 dark:text-zinc-600">—</span>
                             )}
                           </td>
                         </tr>

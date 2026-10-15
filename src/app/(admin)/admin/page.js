@@ -8,6 +8,8 @@ export const metadata = {
   title: 'Admin Overview — Nived Platform',
 };
 
+export const instant = false;
+
 export default async function AdminOverviewPage() {
   const overview = await getAdminOverview();
   const { taps } = await listTelemetry({ limit: 25 });
@@ -15,11 +17,11 @@ export default async function AdminOverviewPage() {
   return (
     <div className="space-y-8">
       {/* Admin Header */}
-      <div className="border-b border-zinc-800/80 pb-5">
-        <h2 className="text-xl font-bold tracking-tight text-zinc-100 sm:text-2xl">
+      <div className="border-b border-zinc-200/80 dark:border-zinc-800/80 pb-5">
+        <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-2xl">
           Platform Overview
         </h2>
-        <p className="mt-1 text-xs text-zinc-400">
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
           Metrik operasional global, provisioning kartu fisik, dan audit tap realtime seluruh merchant.
         </p>
       </div>

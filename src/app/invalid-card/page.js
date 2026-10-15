@@ -20,7 +20,7 @@ async function SlugInfo({ searchParams }) {
       <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
         Requested Card Slug
       </div>
-      <div className="mt-0.5 break-all font-mono text-xs font-semibold text-emerald-900">
+      <div className="mt-0.5 break-all font-mono text-xs font-semibold text-brand-900">
         {slug}
       </div>
     </div>
@@ -83,7 +83,7 @@ export default function InvalidCardPage({ searchParams }) {
         <div className="mt-7 flex flex-col gap-2.5">
           <Link
             href={brandUrl}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-800 transition"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-brand-600 transition"
           >
             Visit Nived Studio
           </Link>

@@ -1,27 +1,62 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+@theme {
+  --color-brand-50: #eff4fe;
+  --color-brand-100: #dbe4fd;
+  --color-brand-200: #bfd0fb;
+  --color-brand-300: #93b2f8;
+  --color-brand-400: #608df3;
+  --color-brand-500: #2A53E7;
+  --color-brand-600: #1f3ec6;
+  --color-brand-700: #1b329f;
+  --color-brand-800: #1b2d80;
+  --color-brand-900: #1b2965;
+  --color-brand-950: #111a3e;
+
+  /* Map emerald to the brand color palette #2A53E7 */
+  --color-emerald-50: #eff4fe;
+  --color-emerald-100: #dbe4fd;
+  --color-emerald-200: #bfd0fb;
+  --color-emerald-300: #93b2f8;
+  --color-emerald-400: #608df3;
+  --color-emerald-500: #2A53E7;
+  --color-emerald-600: #1f3ec6;
+  --color-emerald-700: #1b329f;
+  --color-emerald-800: #1b2d80;
+  --color-emerald-900: #1b2965;
+  --color-emerald-950: #111a3e;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  color-scheme: light;
+  --bg-page: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #f1f5f9;
+  --text-primary: #09090b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --border-subtle: #e4e4e7;
+  --border-strong: #d4d4d8;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg-page: #09090b;
+  --bg-surface: #121215;
+  --bg-surface-elevated: #18181b;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --border-subtle: #27272a;
+  --border-strong: #3f3f46;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

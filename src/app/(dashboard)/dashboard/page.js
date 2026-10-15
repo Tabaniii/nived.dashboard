@@ -8,6 +8,8 @@ export const metadata = {
   title: 'Dashboard — Nived Reputation Shield',
 };
 
+export const instant = false;
+
 export default async function ClientDashboardPage() {
   const ctx = await getClientContext();
   const data = await getClientDashboardData(ctx.profile.merchant_id);
@@ -15,13 +17,13 @@ export default async function ClientDashboardPage() {
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200/80 dark:border-zinc-800/80 pb-5">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-zinc-100 sm:text-2xl">
+          <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-2xl">
             {ctx.merchant?.business_name || 'Merchant Dashboard'}
           </h2>
-          <p className="mt-1 text-xs text-zinc-400">
-            Pemilik: <span className="text-zinc-300 font-medium">{ctx.merchant?.owner_name}</span> &middot; Status: <span className="text-emerald-400 font-medium capitalize">{ctx.merchant?.status}</span>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Pemilik: <span className="text-zinc-800 dark:text-zinc-300 font-medium">{ctx.merchant?.owner_name}</span> &middot; Status: <span className="text-brand-600 dark:text-brand-400 font-semibold capitalize">{ctx.merchant?.status}</span>
           </p>
         </div>
       </div>

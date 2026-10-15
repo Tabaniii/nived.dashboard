@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ShieldCheck, LogOut, Menu, X, User } from 'lucide-react';
 import { logoutAction } from '@/app/(auth)/actions';
+import ThemeToggle from '@/components/theme/ThemeToggle';
 
 /**
  * @param {{
@@ -19,22 +20,22 @@ export default function AppShell({ title, nav, email, children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans selection:bg-brand-500 selection:text-white transition-colors duration-150">
       {/* Sticky Top Header */}
-      <header className="sticky top-0 z-30 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6">
           {/* Brand & Page Context */}
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-xs">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 shadow-xs">
               <ShieldCheck className="size-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-400">
+                <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">
                   Nived
                 </span>
-                <span className="text-zinc-600">/</span>
-                <h1 className="text-sm font-semibold tracking-tight text-zinc-100">
+                <span className="text-zinc-400 dark:text-zinc-600">/</span>
+                <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
                   {title}
                 </h1>
               </div>
@@ -43,7 +44,7 @@ export default function AppShell({ title, nav, email, children }) {
 
           {/* Desktop Navigation & Actions */}
           <div className="hidden md:flex md:items-center md:gap-4">
-            <nav className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/60 p-1" aria-label="Primary Navigation">
+            <nav className="flex items-center gap-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/90 dark:bg-zinc-900/60 p-1" aria-label="Primary Navigation">
               {nav.map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -53,9 +54,9 @@ export default function AppShell({ title, nav, email, children }) {
                     aria-current={isActive ? 'page' : undefined}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                       isActive
-                        ? 'bg-emerald-500/15 text-emerald-300 shadow-xs'
-                        : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
-                    } focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400`}
+                        ? 'bg-brand-500/15 text-brand-700 dark:text-brand-300 font-semibold shadow-xs'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-200'
+                    } focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500`}
                   >
                     {item.label}
                   </Link>
@@ -63,11 +64,14 @@ export default function AppShell({ title, nav, email, children }) {
               })}
             </nav>
 
-            <div className="h-4 w-px bg-zinc-800" aria-hidden="true" />
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" aria-hidden="true" />
+
+            {/* Theme Toggle Button */}
+            <ThemeToggle />
 
             {email ? (
-              <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <User className="size-3.5 text-zinc-500" />
+              <div className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+                <User className="size-3.5 text-zinc-400 dark:text-zinc-500" />
                 <span className="max-w-[160px] truncate">{email}</span>
               </div>
             ) : null}
@@ -76,7 +80,7 @@ export default function AppShell({ title, nav, email, children }) {
               <button
                 type="submit"
                 title="Keluar dari akun"
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/80 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 cursor-pointer"
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 cursor-pointer shadow-xs"
               >
                 <LogOut className="size-3.5" />
                 <span>Keluar</span>
@@ -84,12 +88,13 @@ export default function AppShell({ title, nav, email, children }) {
             </form>
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu & Theme Button */}
           <div className="flex items-center gap-2 md:hidden">
+            <ThemeToggle />
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex size-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/80 text-zinc-300 hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+              className="flex size-9 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
               aria-label={mobileMenuOpen ? 'Tutup menu' : 'Buka menu navigasi'}
               aria-expanded={mobileMenuOpen}
             >
@@ -100,7 +105,7 @@ export default function AppShell({ title, nav, email, children }) {
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen ? (
-          <div className="border-t border-zinc-800/80 bg-zinc-950/95 px-4 py-4 md:hidden">
+          <div className="border-t border-zinc-200 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-950/95 px-4 py-4 md:hidden shadow-lg">
             <nav className="flex flex-col gap-1 pb-3" aria-label="Mobile Navigation">
               {nav.map((item) => {
                 const isActive = pathname === item.href;
@@ -112,8 +117,8 @@ export default function AppShell({ title, nav, email, children }) {
                     aria-current={isActive ? 'page' : undefined}
                     className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                       isActive
-                        ? 'bg-emerald-500/15 text-emerald-300'
-                        : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
+                        ? 'bg-brand-500/15 text-brand-700 dark:text-brand-300 font-semibold'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100'
                     }`}
                   >
                     {item.label}
@@ -122,10 +127,10 @@ export default function AppShell({ title, nav, email, children }) {
               })}
             </nav>
 
-            <div className="border-t border-zinc-800/80 pt-3 flex items-center justify-between gap-3">
+            <div className="border-t border-zinc-200 dark:border-zinc-800/80 pt-3 flex items-center justify-between gap-3">
               {email ? (
-                <div className="flex items-center gap-2 text-xs text-zinc-400 truncate">
-                  <User className="size-3.5 shrink-0 text-zinc-500" />
+                <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 truncate">
+                  <User className="size-3.5 shrink-0 text-zinc-400 dark:text-zinc-500" />
                   <span className="truncate">{email}</span>
                 </div>
               ) : null}
@@ -133,7 +138,7 @@ export default function AppShell({ title, nav, email, children }) {
               <form action={logoutAction} className="shrink-0">
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                  className="flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100"
                 >
                   <LogOut className="size-3.5" />
                   <span>Keluar</span>
@@ -150,7 +155,7 @@ export default function AppShell({ title, nav, email, children }) {
       </main>
 
       {/* Reassuring Footer */}
-      <footer className="mt-auto border-t border-zinc-900 py-4 text-center text-xs text-zinc-600">
+      <footer className="mt-auto border-t border-zinc-200 dark:border-zinc-900 py-4 text-center text-xs text-zinc-500 dark:text-zinc-600">
         Nived NFC Reputation Shield &middot; Enterprise Grade Review Management
       </footer>
     </div>
