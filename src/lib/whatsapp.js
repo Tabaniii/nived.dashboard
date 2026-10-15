@@ -1,12 +1,18 @@
 /**
- * Clean a phone number string by removing non-digits.
+ * Clean a phone number and normalize Indonesian local prefixes.
+ * Strips non-digits, then converts a leading `0` to country code `62`
+ * (e.g. `0812…` → `62812…`) so WhatsApp `wa.me` links work.
  *
  * @param {string} [phone='']
  * @returns {string}
  */
 export function normalizePhoneNumber(phone = '') {
   if (!phone || typeof phone !== 'string') return '';
-  return phone.replace(/\D/g, '');
+  let digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('0')) {
+    digits = `62${digits.slice(1)}`;
+  }
+  return digits;
 }
 
 /**

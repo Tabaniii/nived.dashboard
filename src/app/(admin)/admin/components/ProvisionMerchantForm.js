@@ -3,6 +3,14 @@
 import { useState, useTransition } from 'react';
 import { UserPlus, Copy, Check, AlertTriangle, Building, User, Mail, Lock, Phone, Loader2 } from 'lucide-react';
 import { provisionMerchantAction } from '../actions';
+import { normalizePhoneNumber } from '@/lib/whatsapp';
+
+function handleWhatsAppInput(event) {
+  const normalized = normalizePhoneNumber(event.target.value);
+  if (event.target.value !== normalized) {
+    event.target.value = normalized;
+  }
+}
 
 const fieldClass =
   'w-full rounded-xl border border-zinc-300 dark:border-zinc-800 bg-white dark:bg-zinc-950/80 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-brand-500/60 focus:ring-2 focus:ring-brand-500/20 transition-all';
@@ -120,8 +128,12 @@ export default function ProvisionMerchantForm() {
           <input
             id="contact"
             name="contact"
+            inputMode="tel"
+            autoComplete="tel"
+            onChange={handleWhatsAppInput}
+            onBlur={handleWhatsAppInput}
             className={fieldClass}
-            placeholder="081234567890"
+            placeholder="081234567890 → 6281234567890"
           />
         </div>
 

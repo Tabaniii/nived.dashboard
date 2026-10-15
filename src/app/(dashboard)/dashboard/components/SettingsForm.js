@@ -4,6 +4,14 @@ import { useState, useTransition } from 'react';
 import { ExternalLink, Copy, Check, ShieldCheck, MapPin, Phone, Store, Loader2, Info } from 'lucide-react';
 import { updateCardSettingsAction } from '../actions';
 import { cardPublicUrl } from '@/lib/slug';
+import { normalizePhoneNumber } from '@/lib/whatsapp';
+
+function handleWhatsAppInput(event) {
+  const normalized = normalizePhoneNumber(event.target.value);
+  if (event.target.value !== normalized) {
+    event.target.value = normalized;
+  }
+}
 
 const fieldClass =
   'w-full rounded-xl border border-zinc-300 dark:border-zinc-800 bg-white dark:bg-zinc-950/80 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-brand-500/60 focus:ring-2 focus:ring-brand-500/20 transition-all';
@@ -187,12 +195,16 @@ export default function SettingsForm({ cards = [] }) {
             id="whatsapp_number"
             key={`${selected.id}-wa`}
             name="whatsapp_number"
-            defaultValue={selected.whatsapp_number || ''}
+            inputMode="tel"
+            autoComplete="tel"
+            defaultValue={normalizePhoneNumber(selected.whatsapp_number || '')}
+            onChange={handleWhatsAppInput}
+            onBlur={handleWhatsAppInput}
             className={fieldClass}
-            placeholder="6281234567890"
+            placeholder="081234567890 → 6281234567890"
           />
           <p className="text-[11px] text-zinc-500">
-            Pelanggan dengan keluhan (1–3 bintang) dapat memilih opsi chat langsung ke nomor ini.
+            Boleh ketik 08… — otomatis diubah ke 628…. Pelanggan 1–3★ bisa chat ke nomor ini.
           </p>
         </div>
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { sanitizeReviewUrl } from '@/lib/validation';
+import { normalizePhoneNumber } from '@/lib/whatsapp';
 import { getClientContext } from './queries';
 
 /**
@@ -16,7 +17,7 @@ export async function updateCardSettingsAction(formData) {
 
   const cardId = String(formData.get('card_id') || '').trim();
   const rawGoogleReviewUrl = String(formData.get('google_review_url') || '').trim();
-  const whatsappNumber = String(formData.get('whatsapp_number') || '').trim();
+  const whatsappNumber = normalizePhoneNumber(String(formData.get('whatsapp_number') || ''));
   const storeName = String(formData.get('store_name') || '').trim();
 
   if (!cardId || !rawGoogleReviewUrl) {

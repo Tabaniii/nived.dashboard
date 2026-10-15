@@ -6,6 +6,7 @@ import { requireRole } from '@/lib/auth/session';
 import { buildCardSlug, cardPublicUrl } from '@/lib/slug';
 import { generateTempPassword } from '@/lib/password';
 import { sanitizeReviewUrl } from '@/lib/validation';
+import { normalizePhoneNumber } from '@/lib/whatsapp';
 
 async function assertAdmin() {
   const session = await requireRole('admin');
@@ -26,7 +27,7 @@ export async function provisionMerchantAction(formData) {
 
   const businessName = String(formData.get('business_name') || '').trim();
   const ownerName = String(formData.get('owner_name') || '').trim();
-  const contact = String(formData.get('contact') || '').trim();
+  const contact = normalizePhoneNumber(String(formData.get('contact') || '')) || null;
   const email = String(formData.get('email') || '').trim().toLowerCase();
   const status = String(formData.get('status') || 'trial');
   const customPassword = String(formData.get('password') || '').trim();
@@ -42,7 +43,7 @@ export async function provisionMerchantAction(formData) {
     .insert({
       business_name: businessName,
       owner_name: ownerName,
-      contact: contact || null,
+      contact,
       status: ['trial', 'active', 'suspended'].includes(status) ? status : 'trial',
     })
     .select()
@@ -102,7 +103,7 @@ export async function provisionCardAction(formData, baseUrl) {
   const merchantId = String(formData.get('merchant_id') || '').trim();
   const storeName = String(formData.get('store_name') || '').trim();
   const rawGoogleReviewUrl = String(formData.get('google_review_url') || '').trim();
-  const whatsappNumber = String(formData.get('whatsapp_number') || '').trim();
+  const whatsappNumber = normalizePhoneNumber(String(formData.get('whatsapp_number') || ''));
   const isShieldActive = formData.get('is_shield_active') !== 'false';
 
   if (!merchantId || !storeName || !rawGoogleReviewUrl) {

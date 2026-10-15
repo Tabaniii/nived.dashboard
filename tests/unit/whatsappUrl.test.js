@@ -4,7 +4,9 @@ import { normalizePhoneNumber, formatWhatsAppUrl } from '@/lib/whatsapp';
 describe('WhatsApp URL Utility', () => {
   it('normalizes phone number by stripping spaces, symbols, and formatting', () => {
     expect(normalizePhoneNumber('+62 812-3456-7890')).toBe('6281234567890');
-    expect(normalizePhoneNumber('(021) 555-1234')).toBe('0215551234');
+    expect(normalizePhoneNumber('(021) 555-1234')).toBe('62215551234');
+    expect(normalizePhoneNumber('081234567890')).toBe('6281234567890');
+    expect(normalizePhoneNumber('08 5559 536429')).toBe('6285559536429');
     expect(normalizePhoneNumber('6281234567890')).toBe('6281234567890');
     expect(normalizePhoneNumber('')).toBe('');
     expect(normalizePhoneNumber(null)).toBe('');
