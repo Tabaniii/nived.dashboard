@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import QRCode from 'qrcode';
-import { Search, Copy, Check, QrCode, Shield, ExternalLink, Trash2, X, Download, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, Copy, Check, QrCode, Shield, ExternalLink, Trash2, X, Download, AlertCircle, Loader2, Printer } from 'lucide-react';
 import { softDeleteCardAction, toggleShieldAction } from '../actions';
 import { cardPublicUrl } from '@/lib/slug';
 
@@ -41,6 +41,7 @@ export default function CardsTable({ cards = [] }) {
       color: { dark: '#09090b', light: '#ffffff' },
     });
     setQrModal({
+      id: card.id,
       slug: card.slug,
       store_name: card.store_name,
       url,
@@ -333,6 +334,13 @@ export default function CardsTable({ cards = [] }) {
                 <span>Copy URL</span>
               </button>
             </div>
+            <a
+              href={`/api/dashboard/qr-template?card_id=${qrModal.id}&download=1`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-500/30 bg-brand-500/10 py-2.5 text-xs font-bold text-brand-700 dark:text-brand-300 hover:bg-brand-500/20 transition"
+            >
+              <Printer className="size-4" />
+              <span>Download Template Akrilik A6</span>
+            </a>
           </div>
         </div>
       )}

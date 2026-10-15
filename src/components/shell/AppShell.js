@@ -43,7 +43,7 @@ export default function AppShell({ title, nav, email, children }) {
           </div>
 
           {/* Desktop Navigation & Actions */}
-          <div className="hidden md:flex md:items-center md:gap-4">
+          <div className="hidden lg:flex lg:items-center lg:gap-4">
             <nav className="flex items-center gap-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/90 dark:bg-zinc-900/60 p-1" aria-label="Primary Navigation">
               {nav.map((item) => {
                 const isActive = pathname === item.href;
@@ -52,7 +52,7 @@ export default function AppShell({ title, nav, email, children }) {
                     key={item.href}
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                    className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                       isActive
                         ? 'bg-brand-500/15 text-brand-700 dark:text-brand-300 font-semibold shadow-xs'
                         : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-200'
@@ -70,7 +70,7 @@ export default function AppShell({ title, nav, email, children }) {
             <ThemeToggle />
 
             {email ? (
-              <div className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+              <div className="hidden xl:flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
                 <User className="size-3.5 text-zinc-400 dark:text-zinc-500" />
                 <span className="max-w-[160px] truncate">{email}</span>
               </div>
@@ -89,7 +89,7 @@ export default function AppShell({ title, nav, email, children }) {
           </div>
 
           {/* Mobile Menu & Theme Button */}
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-2 lg:hidden">
             <ThemeToggle />
             <button
               type="button"
@@ -105,7 +105,7 @@ export default function AppShell({ title, nav, email, children }) {
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen ? (
-          <div className="border-t border-zinc-200 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-950/95 px-4 py-4 md:hidden shadow-lg">
+          <div className="border-t border-zinc-200 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-950/95 px-4 py-4 lg:hidden shadow-lg">
             <nav className="flex flex-col gap-1 pb-3" aria-label="Mobile Navigation">
               {nav.map((item) => {
                 const isActive = pathname === item.href;

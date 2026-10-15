@@ -5,6 +5,9 @@ import { getClientContext } from './queries';
 
 const nav = [
   { href: '/dashboard', label: 'Overview' },
+  { href: '/dashboard/mode', label: 'Mode Kartu' },
+  { href: '/dashboard/staff', label: 'Staff & Meja' },
+  { href: '/dashboard/promo', label: 'Promosi' },
   { href: '/dashboard/settings', label: 'Settings' },
 ];
 

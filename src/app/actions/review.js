@@ -1,8 +1,21 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { isValidUUID, isValidRating, sanitizeText } from '@/lib/validation';
 import { getCardById, createFeedback } from '@/lib/db';
 import { getReviewOutcome } from '@/lib/review-routing';
+import { sanitizeStaffCode, sanitizeTableCode } from '@/lib/attribution';
+import { isLowRating, scheduleLowRatingAlert } from '@/lib/alerts';
+import { getClientMeta } from '@/lib/client-meta';
+import { hashIp } from '@/lib/debounce';
+
+async function getRequestSourceKey() {
+  try {
+    return hashIp(getClientMeta(await headers()).clientIp);
+  } catch {
+    return '';
+  }
+}
 
 /**
  * Server Action for saving customer review and resolving smart routing.
@@ -13,6 +26,8 @@ import { getReviewOutcome } from '@/lib/review-routing';
  * @param {number} params.rating
  * @param {string} [params.feedback_text]
  * @param {string} [params.customer_whatsapp]
+ * @param {string} [params.staff_code]
+ * @param {string} [params.table_code]
  * @returns {Promise<{
  *   success: boolean,
  *   message?: string,
@@ -28,6 +43,8 @@ export async function submitReviewAction({
   rating,
   feedback_text = '',
   customer_whatsapp = '',
+  staff_code = '',
+  table_code = '',
 }) {
   if (!card_id || !isValidUUID(card_id)) {
     return {
@@ -68,6 +85,8 @@ export async function submitReviewAction({
       rating: numericRating,
       feedback_text: sanitizedText,
       customer_whatsapp: sanitizedWa || null,
+      staff_code: sanitizeStaffCode(staff_code),
+      table_code: sanitizeTableCode(table_code),
     });
 
     if (!feedback) {
@@ -75,6 +94,10 @@ export async function submitReviewAction({
         success: false,
         error: 'Failed to record feedback in database',
       };
+    }
+
+    if (isLowRating(numericRating)) {
+      scheduleLowRatingAlert({ card, feedback, sourceKey: await getRequestSourceKey() });
     }
 
     return {

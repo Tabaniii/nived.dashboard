@@ -38,6 +38,27 @@ describe('API: POST /api/telemetry/star', () => {
     expect(store.tapLogs[0].device_os).toBe('iOS');
   });
 
+  it('keeps staff and table attribution when star telemetry creates a tap log', async () => {
+    const req = new Request('http://localhost:3000/api/telemetry/star', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '192.168.1.101' },
+      body: JSON.stringify({
+        card_id: validCardId,
+        selected_stars: 4,
+        staff_code: 'Andi',
+        table_code: '12',
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(getMockStore().tapLogs[0]).toMatchObject({
+      selected_stars: 4,
+      staff_code: 'andi',
+      table_code: '12',
+    });
+  });
+
   it('rejects selected_stars out of 1-5 range with 400 Bad Request', async () => {
     const payload = {
       card_id: validCardId,

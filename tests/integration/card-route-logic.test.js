@@ -80,6 +80,22 @@ describe('Card Route Logic & Shield Mode vs Direct Mode', () => {
     expect(resolveCardAction(missingCard)).toEqual({ type: 'fallback' });
   });
 
+  it('records staff and table attribution on tap logs', async () => {
+    const card = await getCardBySlug('demo-card');
+    const result = handleTapTelemetry({
+      cardId: card.id,
+      clientIp: '203.0.113.77',
+      userAgent: 'Mozilla/5.0 (Linux; Android 14)',
+      staffCode: 'andi',
+      tableCode: '12',
+    });
+
+    expect(result).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(getMockStore().tapLogs[0]).toMatchObject({ staff_code: 'andi', table_code: '12' });
+  });
+
   it('records Desktop device category for desktop user agents', async () => {
     const card = await getCardBySlug('demo-card');
     const result = handleTapTelemetry({

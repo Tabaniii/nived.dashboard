@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { submitReviewAction } from '@/app/actions/review';
 import { formatWhatsAppUrl } from '@/lib/whatsapp';
+import { getStoreInitials } from '@/lib/store-initials';
+
+export { getStoreInitials };
 
 export const ratingLabels = [
   'Needs Improvement',
@@ -13,22 +16,15 @@ export const ratingLabels = [
   'Exceptional!',
 ];
 
-/**
- * Extract clean uppercase initials for businesses without a usable logo.
- * @param {string} storeName
- * @returns {string}
- */
-export function getStoreInitials(storeName) {
-  if (!storeName || typeof storeName !== 'string') return 'RT';
-  const parts = storeName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return storeName.trim().slice(0, 2).toUpperCase() || 'RT';
-}
-
-function recordStarTelemetry(cardId, star) {
+function recordStarTelemetry(cardId, star, attribution) {
   if (!cardId) return;
 
-  const payload = JSON.stringify({ card_id: cardId, selected_stars: star });
+  const payload = JSON.stringify({
+    card_id: cardId,
+    selected_stars: star,
+    staff_code: attribution?.staffCode || undefined,
+    table_code: attribution?.tableCode || undefined,
+  });
   if (typeof navigator.sendBeacon === 'function') {
     try {
       if (
@@ -71,7 +67,7 @@ function StarIcon({ className, filled }) {
   );
 }
 
-export default function RatingClientView({ card }) {
+export default function RatingClientView({ card, attribution }) {
   const [selectedRating, setSelectedRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [feedbackText, setFeedbackText] = useState('');
@@ -119,18 +115,10 @@ export default function RatingClientView({ card }) {
   };
 
   const handleRatingChange = (star) => {
-    if (submittingRef.current || savedReview || isRedirecting) return;
+    if (submittingRef.current || savedReview) return;
     setSelectedRating(star);
     setSubmitError('');
-    recordStarTelemetry(card?.id, star);
-
-    // If 4 or 5 stars and destination URL is configured, trigger smooth redirect
-    if (star >= 4 && card?.google_review_url) {
-      setIsRedirecting(true);
-      redirectTimeoutRef.current = setTimeout(() => {
-        window.location.href = card.google_review_url;
-      }, 400);
-    }
+    recordStarTelemetry(card?.id, star, attribution);
   };
 
   const handleFeedbackSubmit = async (event) => {
@@ -143,6 +131,12 @@ export default function RatingClientView({ card }) {
       return;
     }
 
+    const trimmedText = feedbackText.trim();
+    // Copy inside the tap itself: Safari rejects clipboard writes after an await.
+    if (selectedRating >= 4 && card?.google_review_url && trimmedText) {
+      void copyReview(trimmedText);
+    }
+
     submittingRef.current = true;
     setIsSubmitting(true);
     setHoverRating(0);
@@ -151,7 +145,9 @@ export default function RatingClientView({ card }) {
     const payload = {
       card_id: card?.id,
       rating: selectedRating,
-      feedback_text: feedbackText.trim(),
+      feedback_text: trimmedText,
+      staff_code: attribution?.staffCode || '',
+      table_code: attribution?.tableCode || '',
     };
 
     try {
@@ -188,7 +184,7 @@ export default function RatingClientView({ card }) {
         }
       }
 
-      const savedText = typeof result.feedback_text === 'string' ? result.feedback_text : feedbackText.trim();
+      const savedText = typeof result.feedback_text === 'string' ? result.feedback_text : trimmedText;
 
       setSavedReview({
         rating: selectedRating,
@@ -196,9 +192,11 @@ export default function RatingClientView({ card }) {
         googleReviewUrl,
       });
 
-      // Auto-copy review text to clipboard for high ratings
-      if (googleReviewUrl && savedText) {
-        void copyReview(savedText);
+      if (googleReviewUrl) {
+        setIsRedirecting(true);
+        redirectTimeoutRef.current = setTimeout(() => {
+          window.location.href = googleReviewUrl;
+        }, savedText ? 1500 : 700);
       }
     } catch (err) {
       setSubmitError(err.message || 'Connection error. Please try submitting again.');
@@ -266,46 +264,7 @@ export default function RatingClientView({ card }) {
         </header>
 
         {/* Confirmation Screens vs Rating Form */}
-        {isRedirecting ? (
-          <section
-            className="px-6 py-8 text-center sm:px-8 transition-all animate-in fade-in duration-200"
-            aria-live="polite"
-          >
-            <div className="space-y-6">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-50 text-amber-500 shadow-sm ring-4 ring-amber-100/70 scale-105 transition-transform">
-                <StarIcon className="h-9 w-9 animate-pulse" filled={true} />
-              </div>
-
-              <div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-[11px] font-semibold text-brand-800 ring-1 ring-brand-600/20">
-                  <span className="h-2 w-2 rounded-full bg-brand-500 animate-ping" />
-                  {selectedRating} of 5 Stars · Exceptional!
-                </span>
-                <h2 className="mt-3 text-2xl font-bold tracking-tight text-stone-900">
-                  Opening Google Reviews…
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-stone-600">
-                  Thank you for rating {storeName}! We are redirecting you to share your experience directly on Google.
-                </p>
-              </div>
-
-              <div className="pt-2">
-                <a
-                  href={card?.google_review_url}
-                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-5 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-brand-600 transition"
-                >
-                  <span>Continue to Google Reviews</span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M7 7h10v10" />
-                  </svg>
-                </a>
-                <p className="mt-2 text-[11px] text-stone-400">
-                  Tap above if you are not automatically redirected.
-                </p>
-              </div>
-            </div>
-          </section>
-        ) : savedReview ? (
+        {savedReview ? (
           <section
             className="px-6 py-8 text-center sm:px-8 transition-all"
             aria-labelledby="confirmation-title"
@@ -333,8 +292,24 @@ export default function RatingClientView({ card }) {
                     Thank you for the wonderful rating!
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-stone-600">
-                    We are thrilled you had a great experience! Would you take 10 seconds to share your review on Google?
+                    {!savedReview.text
+                      ? 'Would you take 10 seconds to share your experience on Google?'
+                      : clipboardStatus === 'manual'
+                        ? 'Copy your review below, then paste it on Google and tap Post.'
+                        : 'Your review is copied — just paste it on Google and tap Post.'}
                   </p>
+                  {isRedirecting && (
+                    <p
+                      aria-live="polite"
+                      className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-brand-700"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+                      />
+                      Opening Google Reviews…
+                    </p>
+                  )}
                 </div>
 
                 {savedReview.text && (
@@ -587,9 +562,11 @@ export default function RatingClientView({ card }) {
 
                   <div className="mt-1.5 flex items-center justify-between text-[11px] text-stone-400">
                     <span>
-                      {isHighRating
-                        ? 'You will have the option to post this to Google.'
-                        : 'Sent privately to management.'}
+                      {!isHighRating
+                        ? 'Sent privately to management.'
+                        : card?.google_review_url
+                          ? "We'll copy it so you can paste it on Google."
+                          : 'Thank you for sharing!'}
                     </span>
                     <span id="feedback-count" className="tabular-nums">
                       {feedbackText.length}/2000
@@ -610,6 +587,14 @@ export default function RatingClientView({ card }) {
                   <span>{submitError}</span>
                 </div>
               )}
+              {submitError && isHighRating && card?.google_review_url && (
+                <a
+                  href={card.google_review_url}
+                  className="mt-2 block text-center text-xs font-semibold text-brand-800 underline decoration-brand-800/40 underline-offset-4"
+                >
+                  Skip and continue to Google Reviews
+                </a>
+              )}
 
               {/* Submit Review Button & WhatsApp Escalation */}
               <div className="mt-6 space-y-2.5">
@@ -627,7 +612,13 @@ export default function RatingClientView({ card }) {
                       <span>Submitting Feedback…</span>
                     </>
                   ) : (
-                    <span>{selectedRating <= 3 ? 'Submit Private Feedback' : 'Submit Review'}</span>
+                    <span>
+                      {selectedRating <= 3
+                        ? 'Submit Private Feedback'
+                        : card?.google_review_url
+                          ? 'Continue to Google Reviews'
+                          : 'Submit Review'}
+                    </span>
                   )}
                 </button>
 

@@ -1,7 +1,9 @@
+import { Suspense } from 'react';
 import { Zap, Calendar, Star, ShieldAlert } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import TrendCharts from './components/TrendCharts';
 import FeedbackBox from './components/FeedbackBox';
+import WeeklySummary, { WeeklySummarySkeleton } from './components/WeeklySummary';
 import { getClientContext, getClientDashboardData } from './queries';
 
 export const metadata = {
@@ -57,6 +59,10 @@ export default async function ClientDashboardPage() {
           badge="Shielded"
         />
       </section>
+
+      <Suspense fallback={<WeeklySummarySkeleton />}>
+        <WeeklySummary merchantId={ctx.profile.merchant_id} />
+      </Suspense>
 
       {/* Trend Analytics Section */}
       <TrendCharts

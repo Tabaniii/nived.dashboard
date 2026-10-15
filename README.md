@@ -82,6 +82,16 @@ Sistem ini menghubungkan interaksi fisik kartu NFC / scan QR meja kasir dengan r
 - 📱 **Generator QR Code Dinamis:**
   - Menghasilkan QR Code SVG dan PNG resolusi tinggi secara instan dari dashboard untuk kebutuhan cetak akrilik/stiker meja.
 
+### Fitur Growth (butuh migrasi `20261015000000_growth_features.sql`)
+
+- 🔔 **Alert instan rating 1–3★** ke WhatsApp (Fonnte) dan/atau Telegram, dikirim setelah respons (pelanggan tidak menunggu). Anti-spam: 1 alert/menit per pengunjung dan maks 20/jam per kartu. Atur di **Settings → Alert Instan**, lengkap dengan tombol **Kirim Tes**.
+- ✍️ **Alur 4–5★ dengan kotak cerita:** pelanggan boleh menulis pengalaman (opsional). Teks disimpan sebagai social proof dan otomatis disalin agar tinggal ditempel di Google. Tidak ada insentif/voucher, sesuai kebijakan ulasan Google.
+- 👤 **Tracking staf & meja:** tambahkan `?staff=andi&meja=12` di link kartu/QR. Halaman **Staff & Meja** menampilkan leaderboard staf dan meja yang paling sering dikeluhkan.
+- 🤖 **Ringkasan AI mingguan** (Google Gemini, fallback analisis aturan bila `GEMINI_API_KEY` kosong) di Overview, plus digest WA/Telegram tiap Senin 08:00 WIB via Vercel Cron (`/api/cron/weekly-summary`).
+- 🔀 **Smart Mode Switcher:** halaman **Mode Kartu** untuk ganti kartu ke mode Review / Promo / Redirect dengan batas waktu, tanpa mengganti link NFC. `/r/[slug]?view=review` selalu membuka halaman rating.
+- 🖨️ **Template akrilik A6 (1240×1748, 300 dpi)** dengan logo, QR, dan nomor meja: halaman **Promosi** atau tombol di modal QR admin.
+- 📸 **Social proof generator:** ulasan 5★ bertulisan → PNG IG Story (1080×1920) / Post (1080×1080) dengan logo toko.
+
 ---
 
 ## 🛠 Tech Stack
@@ -215,6 +225,18 @@ NEXT_PUBLIC_APP_URL=https://nived.studio
 ADMIN_EMAIL=admin@nived.id
 ADMIN_PASSWORD=PasswordKuatAnda123!
 ADMIN_FULL_NAME="Nived Administrator"
+
+# Opsional — alert rating jelek & digest mingguan
+FONNTE_TOKEN=token-device-fonnte
+TELEGRAM_BOT_TOKEN=123456:ABC-token-dari-BotFather
+TELEGRAM_BOT_USERNAME=NamaBotAnda
+
+# Opsional — ringkasan AI mingguan
+GEMINI_API_KEY=kunci-dari-aistudio.google.com
+GEMINI_MODEL=gemini-flash-latest
+
+# Wajib untuk cron mingguan di Vercel
+CRON_SECRET=string-acak-panjang
 ```
 
 > ⚠️ **PENTING:** Pastikan `NEXT_PUBLIC_APP_URL` menggunakan domain produksi/staging Anda (contoh: `https://nived.studio`) dan bukan domain bawaan Vercel `.vercel.app` agar tautan NFC yang dicetak permanen tetap konsisten.
@@ -224,6 +246,7 @@ Jalankan skrip migrasi database di Supabase SQL Editor:
 1. Buka dashboard proyek Supabase Anda -> **SQL Editor**.
 2. Salin dan jalankan isi file [`schema.sql`](file:///Users/tabaniii/Herd/filter-rating/schema.sql) atau migrasi di folder [`supabase/migrations/`](file:///Users/tabaniii/Herd/filter-rating/supabase/migrations/).
 3. Skrip akan membuat tabel `cards`, `tap_logs`, `internal_feedbacks`, indeks penelusuran, serta sample seed data untuk pengujian lokal.
+4. Untuk fitur growth, jalankan juga [`supabase/migrations/20261015000000_growth_features.sql`](supabase/migrations/20261015000000_growth_features.sql). Migrasi ini hanya menambah kolom/tabel (aman dijalankan ulang). Sebelum dijalankan, aplikasi tetap berjalan dan dashboard menampilkan pengingat migrasi.
 
 ### 5. Seed Akun Admin
 Jalankan perintah berikut untuk membuat akun administrator pertama:
@@ -259,7 +282,7 @@ Akses aplikasi pada browser di:
 Seluruh modul inti (validasi URL, perutean kartu, debounce IP, parsing perangkat, dan endpoint API) dilindungi oleh suite pengujian otomatis:
 
 ```bash
-# Menjalankan seluruh pengujian (67 tests)
+# Menjalankan seluruh pengujian (171 tests)
 npm test
 
 # Menjalankan linter (ESLint 9)

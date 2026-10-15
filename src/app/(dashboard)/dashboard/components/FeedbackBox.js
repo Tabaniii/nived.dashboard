@@ -1,7 +1,48 @@
 'use client';
 
 import { useState } from 'react';
-import { Star, MessageSquare, PhoneCall, ShieldCheck, Filter } from 'lucide-react';
+import Link from 'next/link';
+import { Star, MessageSquare, PhoneCall, ShieldCheck, Filter, ImageIcon } from 'lucide-react';
+
+function followUpText(feedback) {
+  const store = feedback.cards?.store_name || 'toko kami';
+  return encodeURIComponent(
+    feedback.rating >= 4
+      ? `Halo Kak, terima kasih banyak atas ulasan positifnya untuk ${store}! Senang sekali Kakak puas. Sampai jumpa di kunjungan berikutnya.`
+      : `Halo Kak, terima kasih atas masukannya saat berkunjung ke ${store}. Kami dari tim manajemen ingin menindaklanjuti keluhan Anda agar ke depan lebih baik.`
+  );
+}
+
+function AttributionChips({ feedback }) {
+  if (!feedback.table_code && !feedback.staff_code) return null;
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {feedback.table_code && (
+        <span className="rounded-md border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-300">
+          Meja {feedback.table_code}
+        </span>
+      )}
+      {feedback.staff_code && (
+        <span className="rounded-md border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-300">
+          Staf: {feedback.staff_code}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function SocialProofLink({ feedback }) {
+  if (feedback.rating !== 5 || !feedback.feedback_text?.trim()) return null;
+  return (
+    <Link
+      href={`/dashboard/promo?review=${feedback.id}#social-proof`}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-brand-700 dark:text-brand-300 transition hover:bg-brand-500/20 shadow-xs"
+    >
+      <ImageIcon className="size-3" />
+      <span>Jadikan konten IG</span>
+    </Link>
+  );
+}
 
 export default function FeedbackBox({ feedbacks = [] }) {
   const [filterRating, setFilterRating] = useState('all');
@@ -30,7 +71,7 @@ export default function FeedbackBox({ feedbacks = [] }) {
           <span className="flex items-center gap-1 pl-1.5 text-zinc-500">
             <Filter className="size-3" />
           </span>
-          {['all', '1', '2', '3'].map((r) => (
+          {['all', '1', '2', '3', '4', '5'].map((r) => (
             <button
               key={r}
               type="button"
@@ -69,11 +110,7 @@ export default function FeedbackBox({ feedbacks = [] }) {
           <div className="space-y-3 md:hidden">
             {filtered.map((f) => {
               const cleanPhone = f.customer_whatsapp?.replace(/\D/g, '');
-              const waText = encodeURIComponent(
-                `Halo Kak, terima kasih atas masukannya saat berkunjung ke ${
-                  f.cards?.store_name || 'toko kami'
-                }. Kami dari tim manajemen ingin menindaklanjuti keluhan Anda agar ke depan lebih baik.`
-              );
+              const waText = followUpText(f);
 
               return (
                 <div
@@ -89,6 +126,7 @@ export default function FeedbackBox({ feedbacks = [] }) {
                       <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-300 truncate max-w-[150px]">
                         {f.cards?.store_name || '—'}
                       </span>
+                      <AttributionChips feedback={f} />
                     </div>
                     <span className="text-[11px] text-zinc-500">
                       {new Date(f.created_at).toLocaleString('id-ID', {
@@ -126,6 +164,7 @@ export default function FeedbackBox({ feedbacks = [] }) {
                   ) : (
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-600">Pelanggan tidak mengisi nomor WA.</p>
                   )}
+                  <SocialProofLink feedback={f} />
                 </div>
               );
             })}
@@ -146,11 +185,7 @@ export default function FeedbackBox({ feedbacks = [] }) {
               <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800/80">
                 {filtered.map((f) => {
                   const cleanPhone = f.customer_whatsapp?.replace(/\D/g, '');
-                  const waText = encodeURIComponent(
-                    `Halo Kak, terima kasih atas masukannya saat berkunjung ke ${
-                      f.cards?.store_name || 'toko kami'
-                    }. Kami dari tim manajemen ingin menindaklanjuti keluhan Anda agar ke depan lebih baik.`
-                  );
+                  const waText = followUpText(f);
 
                   return (
                     <tr key={f.id} className="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30">
@@ -161,7 +196,8 @@ export default function FeedbackBox({ feedbacks = [] }) {
                         })}
                       </td>
                       <td className="px-4 py-3.5 font-medium text-zinc-800 dark:text-zinc-200">
-                        {f.cards?.store_name || '—'}
+                        <div>{f.cards?.store_name || '—'}</div>
+                        <AttributionChips feedback={f} />
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-500 dark:text-amber-400 border border-amber-500/20">
@@ -177,19 +213,22 @@ export default function FeedbackBox({ feedbacks = [] }) {
                         )}
                       </td>
                       <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                        {cleanPhone ? (
-                          <a
-                            href={`https://wa.me/${cleanPhone}?text=${waText}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/30 px-3 py-1.5 text-xs font-medium text-[#25D366] transition shadow-xs"
-                          >
-                            <PhoneCall className="size-3" />
-                            <span>Hubungi WA ({cleanPhone})</span>
-                          </a>
-                        ) : (
-                          <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
-                        )}
+                        <div className="inline-flex flex-col items-end gap-1.5">
+                          {cleanPhone ? (
+                            <a
+                              href={`https://wa.me/${cleanPhone}?text=${waText}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/30 px-3 py-1.5 text-xs font-medium text-[#25D366] transition shadow-xs"
+                            >
+                              <PhoneCall className="size-3" />
+                              <span>Hubungi WA ({cleanPhone})</span>
+                            </a>
+                          ) : (
+                            <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
+                          )}
+                          <SocialProofLink feedback={f} />
+                        </div>
                       </td>
                     </tr>
                   );

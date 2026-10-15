@@ -114,6 +114,27 @@ describe('API: POST /api/feedback', () => {
     expect(res.status).toBe(404);
   });
 
+  it('stores staff and table attribution from the request body', async () => {
+    const req = new Request('http://localhost:3000/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_id: validCardId,
+        rating: 3,
+        feedback_text: 'Agak lama',
+        staff_code: 'Budi',
+        table_code: 'vip 2',
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    expect(getMockStore().feedbacks[0]).toMatchObject({
+      staff_code: 'budi',
+      table_code: 'VIP-2',
+    });
+  });
+
   it('handles invalid JSON payload gracefully', async () => {
     const req = new Request('http://localhost:3000/api/feedback', {
       method: 'POST',

@@ -1,5 +1,6 @@
 import SettingsForm from '../components/SettingsForm';
 import { getClientContext, getClientCards } from '../queries';
+import { getNotifyStatus } from '@/lib/notify';
 
 export const metadata = {
   title: 'Pengaturan Toko — Dashboard Nived',
@@ -18,11 +19,11 @@ export default async function DashboardSettingsPage() {
           Pengaturan Toko
         </h2>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          Kelola Google Review URL dan nomor WhatsApp manager untuk masing-masing kartu NFC Anda.
+          Kelola Google Review URL, nomor WhatsApp manager, dan alert rating jelek untuk masing-masing kartu NFC Anda.
         </p>
       </div>
 
-      <SettingsForm cards={cards} />
+      <SettingsForm cards={cards} notifyStatus={getNotifyStatus()} />
     </div>
   );
 }

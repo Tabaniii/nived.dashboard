@@ -4,6 +4,7 @@ import { recordStarTelemetry, getCardById } from '@/lib/db';
 import { parseDeviceOS } from '@/lib/device';
 import { hashIp } from '@/lib/debounce';
 import { getClientMeta } from '@/lib/client-meta';
+import { sanitizeStaffCode, sanitizeTableCode } from '@/lib/attribution';
 
 /**
  * POST /api/telemetry/star
@@ -20,7 +21,7 @@ export async function POST(request) {
     );
   }
 
-  const { card_id, selected_stars } = body || {};
+  const { card_id, selected_stars, staff_code, table_code } = body || {};
 
   // 1. Validate card_id
   if (!card_id || !isValidUUID(card_id)) {
@@ -61,6 +62,8 @@ export async function POST(request) {
       ip_hash: ipHash,
       device_os: deviceOs,
       user_agent: userAgent,
+      staff_code: sanitizeStaffCode(staff_code),
+      table_code: sanitizeTableCode(table_code),
     });
 
     if (!result) {

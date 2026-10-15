@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { isValidUUID, isValidRating, sanitizeText } from '@/lib/validation';
 import { getCardById, createFeedback } from '@/lib/db';
 import { getReviewOutcome } from '@/lib/review-routing';
+import { sanitizeStaffCode, sanitizeTableCode } from '@/lib/attribution';
+import { scheduleLowRatingAlert } from '@/lib/alerts';
+import { getClientMeta } from '@/lib/client-meta';
+import { hashIp } from '@/lib/debounce';
 
 /**
  * POST /api/feedback
@@ -18,7 +22,7 @@ export async function POST(request) {
     );
   }
 
-  const { card_id, rating, feedback_text, customer_whatsapp } = body || {};
+  const { card_id, rating, feedback_text, customer_whatsapp, staff_code, table_code } = body || {};
 
   // 1. Validate card_id (must be valid UUID format)
   if (!card_id || !isValidUUID(card_id)) {
@@ -69,6 +73,8 @@ export async function POST(request) {
       rating: Number(rating),
       feedback_text: sanitizedText,
       customer_whatsapp: sanitizedWa || null,
+      staff_code: sanitizeStaffCode(staff_code),
+      table_code: sanitizeTableCode(table_code),
     });
 
     if (!feedback) {
@@ -77,6 +83,12 @@ export async function POST(request) {
         { status: 500 }
       );
     }
+
+    scheduleLowRatingAlert({
+      card,
+      feedback,
+      sourceKey: hashIp(getClientMeta(request.headers).clientIp),
+    });
 
     return NextResponse.json(
       {

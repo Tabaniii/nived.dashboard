@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { isMissingSchemaError } from '@/lib/db-errors';
 
 /**
  * In-memory fallback store when Supabase environment variables are not set
@@ -28,6 +29,30 @@ const initialMockCards = [
 let mockCards = [...initialMockCards];
 let mockTapLogs = [];
 let mockFeedbacks = [];
+
+function attributionColumns({ staff_code, table_code }) {
+  return {
+    ...(staff_code ? { staff_code } : {}),
+    ...(table_code ? { table_code } : {}),
+  };
+}
+
+/**
+ * Insert a row; if the staff/table columns are not migrated yet, retry without
+ * them so taps and feedback are never lost.
+ */
+async function insertWithAttributionFallback(table, row) {
+  const result = await supabase.from(table).insert([row]).select().single();
+  const hasAttribution = 'staff_code' in row || 'table_code' in row;
+
+  if (result.error && hasAttribution && isMissingSchemaError(result.error)) {
+    console.warn(`[db] ${table} has no staff/table columns yet; run the growth_features migration.`);
+    const { staff_code: _staff, table_code: _table, ...rest } = row;
+    return supabase.from(table).insert([rest]).select().single();
+  }
+
+  return result;
+}
 
 /**
  * Fetch a single card by its unique slug.
@@ -106,6 +131,8 @@ export async function getCardById(id) {
  * @param {string} entry.user_agent
  * @param {string} [entry.ip_hash]
  * @param {number} [entry.selected_stars]
+ * @param {string|null} [entry.staff_code]
+ * @param {string|null} [entry.table_code]
  * @returns {Promise<Object|null>}
  */
 export async function createTapLog({
@@ -114,6 +141,8 @@ export async function createTapLog({
   user_agent,
   ip_hash = null,
   selected_stars = null,
+  staff_code = null,
+  table_code = null,
 }) {
   const row = {
     card_id,
@@ -121,16 +150,13 @@ export async function createTapLog({
     user_agent,
     ip_hash,
     selected_stars,
+    ...attributionColumns({ staff_code, table_code }),
     created_at: new Date().toISOString(),
   };
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase
-        .from('tap_logs')
-        .insert([row])
-        .select()
-        .single();
+      const { data, error } = await insertWithAttributionFallback('tap_logs', row);
 
       if (error) {
         console.error('[db] Error creating tap log:', error.message);
@@ -158,6 +184,8 @@ export async function createTapLog({
  * @param {string} [params.ip_hash]
  * @param {string} [params.device_os='Other']
  * @param {string} [params.user_agent='']
+ * @param {string|null} [params.staff_code] used only when a new tap log is created
+ * @param {string|null} [params.table_code] used only when a new tap log is created
  * @returns {Promise<Object|null>}
  */
 export async function recordStarTelemetry({
@@ -166,6 +194,8 @@ export async function recordStarTelemetry({
   ip_hash = null,
   device_os = 'Other',
   user_agent = '',
+  staff_code = null,
+  table_code = null,
 }) {
   if (isSupabaseConfigured && supabase) {
     try {
@@ -202,6 +232,8 @@ export async function recordStarTelemetry({
         user_agent,
         ip_hash,
         selected_stars,
+        staff_code,
+        table_code,
       });
     } catch (err) {
       console.error('[db] Supabase connection error in recordStarTelemetry:', err);
@@ -226,6 +258,8 @@ export async function recordStarTelemetry({
     user_agent,
     ip_hash,
     selected_stars,
+    staff_code,
+    table_code,
   });
 }
 
@@ -237,6 +271,8 @@ export async function recordStarTelemetry({
  * @param {number} entry.rating
  * @param {string} [entry.feedback_text]
  * @param {string} [entry.customer_whatsapp]
+ * @param {string|null} [entry.staff_code]
+ * @param {string|null} [entry.table_code]
  * @returns {Promise<Object|null>}
  */
 export async function createFeedback({
@@ -244,22 +280,21 @@ export async function createFeedback({
   rating,
   feedback_text = '',
   customer_whatsapp = null,
+  staff_code = null,
+  table_code = null,
 }) {
   const row = {
     card_id,
     rating,
     feedback_text: feedback_text || null,
     customer_whatsapp: customer_whatsapp || null,
+    ...attributionColumns({ staff_code, table_code }),
     created_at: new Date().toISOString(),
   };
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase
-        .from('internal_feedbacks')
-        .insert([row])
-        .select()
-        .single();
+      const { data, error } = await insertWithAttributionFallback('internal_feedbacks', row);
 
       if (error) {
         console.error('[db] Error creating internal feedback:', error.message);
@@ -286,6 +321,34 @@ export async function createFeedback({
   const inserted = { id: mockFeedbacks.length + 1, ...row };
   mockFeedbacks.push(inserted);
   return inserted;
+}
+
+/**
+ * Stamp a feedback row once its low-rating alert was delivered.
+ *
+ * @param {number|string} id
+ * @returns {Promise<boolean>}
+ */
+export async function markFeedbackAlertSent(id) {
+  if (id == null) return false;
+  const sentAt = new Date().toISOString();
+
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase
+      .from('internal_feedbacks')
+      .update({ alert_sent_at: sentAt })
+      .eq('id', id);
+
+    if (error) {
+      console.warn('[db] Could not mark feedback alert as sent:', error.message);
+      return false;
+    }
+    return true;
+  }
+
+  const row = mockFeedbacks.find((f) => f.id === id);
+  if (row) row.alert_sent_at = sentAt;
+  return Boolean(row);
 }
 
 /**

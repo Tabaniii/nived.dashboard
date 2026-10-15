@@ -1,5 +1,8 @@
 import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { isMissingSchemaError } from '@/lib/db-errors';
+import { buildLeaderboard } from '@/lib/staff-stats';
+import { resolveDateRange } from '@/lib/date-range';
 
 export async function getClientContext() {
   await connection();
@@ -26,9 +29,7 @@ export async function getClientCards(merchantId) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('cards')
-    .select(
-      'id, slug, store_name, google_review_url, whatsapp_number, is_shield_active, created_at'
-    )
+    .select('*')
     .eq('merchant_id', merchantId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true });
@@ -69,9 +70,7 @@ export async function getClientDashboardData(merchantId) {
       .gte('created_at', tapQueryStart.toISOString()),
     supabase
       .from('internal_feedbacks')
-      .select(
-        'id, rating, feedback_text, customer_whatsapp, created_at, card_id, cards(store_name)'
-      )
+      .select('*, cards(store_name)')
       .in('card_id', cardIds)
       .order('created_at', { ascending: false })
       .limit(100),
@@ -155,5 +154,122 @@ export async function getClientDashboardData(merchantId) {
     weekly,
     peakHours,
     feedbacks,
+  };
+}
+
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 20;
+
+/**
+ * PostgREST caps responses (1000 rows on Supabase), so page through results.
+ * @param {(from: number, to: number) => PromiseLike<{ data: any[]|null, error: any }>} fetchPage
+ */
+async function fetchAllRows(fetchPage) {
+  const rows = [];
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const from = page * PAGE_SIZE;
+    const { data, error } = await fetchPage(from, from + PAGE_SIZE - 1);
+    if (error) return { data: null, error };
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return { data: rows, error: null };
+}
+
+/**
+ * Staff and table leaderboards for the selected WIB reporting window.
+ *
+ * @param {string} merchantId
+ * @param {string} rangeKey 'month' | 'last_month' | '30d'
+ */
+export async function getStaffPerformance(merchantId, rangeKey) {
+  await connection();
+  const supabase = await createClient();
+  const cards = await getClientCards(merchantId);
+  const cardIds = cards.map((c) => c.id);
+  const range = resolveDateRange(rangeKey);
+
+  const empty = {
+    cards,
+    range,
+    staff: [],
+    tables: [],
+    totals: { taps: 0, attributedTaps: 0 },
+    needsMigration: false,
+  };
+  if (cardIds.length === 0) return empty;
+
+  const startIso = range.start.toISOString();
+  const endIso = range.end.toISOString();
+
+  const [tapsResult, feedbacksResult] = await Promise.all([
+    fetchAllRows((from, to) =>
+      supabase
+        .from('tap_logs')
+        .select('id, card_id, staff_code, table_code, selected_stars, created_at')
+        .in('card_id', cardIds)
+        .gte('created_at', startIso)
+        .lt('created_at', endIso)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows((from, to) =>
+      supabase
+        .from('internal_feedbacks')
+        .select('id, card_id, staff_code, table_code, rating, created_at')
+        .in('card_id', cardIds)
+        .gte('created_at', startIso)
+        .lt('created_at', endIso)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+  ]);
+
+  if (isMissingSchemaError(tapsResult.error) || isMissingSchemaError(feedbacksResult.error)) {
+    return { ...empty, needsMigration: true };
+  }
+  if (tapsResult.error) throw tapsResult.error;
+  if (feedbacksResult.error) throw feedbacksResult.error;
+
+  const taps = tapsResult.data;
+  const feedbacks = feedbacksResult.data;
+
+  return {
+    cards,
+    range,
+    staff: buildLeaderboard({ taps, feedbacks, key: 'staff_code' }),
+    tables: buildLeaderboard({ taps, feedbacks, key: 'table_code' }),
+    totals: {
+      taps: taps.length,
+      attributedTaps: taps.filter((t) => t.staff_code || t.table_code).length,
+    },
+    needsMigration: false,
+  };
+}
+
+/**
+ * Recent 5★ reviews with text, usable for social proof graphics.
+ * @param {string} merchantId
+ */
+export async function getSocialProofCandidates(merchantId) {
+  await connection();
+  const supabase = await createClient();
+  const cards = await getClientCards(merchantId);
+  const cardIds = cards.map((c) => c.id);
+  if (cardIds.length === 0) return { cards, reviews: [] };
+
+  const { data, error } = await supabase
+    .from('internal_feedbacks')
+    .select('id, rating, feedback_text, created_at, card_id, cards(store_name)')
+    .in('card_id', cardIds)
+    .eq('rating', 5)
+    .not('feedback_text', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (error) throw error;
+  return {
+    cards,
+    reviews: (data || []).filter((review) => review.feedback_text?.trim()),
   };
 }
