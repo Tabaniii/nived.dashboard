@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Star, MessageSquare, PhoneCall, ShieldCheck, Filter, ImageIcon } from 'lucide-react';
+
+const dateFmt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'short', timeStyle: 'short' });
 
 function followUpText(feedback) {
   const store = feedback.cards?.store_name || 'toko kami';
@@ -31,30 +33,79 @@ function AttributionChips({ feedback }) {
   );
 }
 
-function SocialProofLink({ feedback }) {
-  if (feedback.rating !== 5 || !feedback.feedback_text?.trim()) return null;
+function FeedbackCard({ feedback: f }) {
+  const cleanPhone = f.customer_whatsapp?.replace(/\D/g, '');
+  const waText = followUpText(f);
+  const showSocial = f.rating === 5 && f.feedback_text?.trim();
+
   return (
-    <Link
-      href={`/dashboard/promo?review=${feedback.id}#social-proof`}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-brand-700 dark:text-brand-300 transition hover:bg-brand-500/20 shadow-xs"
+    <article
+      className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-4 shadow-xs space-y-3"
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 180px' }}
     >
-      <ImageIcon className="size-3" />
-      <span>Jadikan konten IG</span>
-    </Link>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-500 dark:text-amber-400 border border-amber-500/20">
+            <Star className="size-3 fill-amber-400 text-amber-400" />
+            {f.rating}/5
+          </span>
+          <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-300 truncate max-w-[150px]">
+            {f.cards?.store_name || '—'}
+          </span>
+          <AttributionChips feedback={f} />
+        </div>
+        <span className="shrink-0 text-[11px] text-zinc-500">{dateFmt.format(new Date(f.created_at))}</span>
+      </div>
+
+      <p className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-950/60 p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/50">
+        {f.feedback_text ? (
+          `"${f.feedback_text}"`
+        ) : (
+          <span className="italic text-zinc-500">Tidak ada catatan tertulis dari pelanggan.</span>
+        )}
+      </p>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+        {cleanPhone ? (
+          <>
+            <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-mono">+{cleanPhone}</span>
+            <a
+              href={`https://wa.me/${cleanPhone}?text=${waText}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/30 px-3 py-1.5 text-xs font-medium text-[#25D366] transition shadow-xs"
+            >
+              <PhoneCall className="size-3" />
+              <span>Hubungi via WA</span>
+            </a>
+          </>
+        ) : (
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-600">Pelanggan tidak mengisi nomor WA.</p>
+        )}
+        {showSocial && (
+          <Link
+            href={`/dashboard/promo?review=${f.id}#social-proof`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-brand-700 dark:text-brand-300 transition hover:bg-brand-500/20 shadow-xs"
+          >
+            <ImageIcon className="size-3" />
+            <span>Jadikan konten IG</span>
+          </Link>
+        )}
+      </div>
+    </article>
   );
 }
 
 export default function FeedbackBox({ feedbacks = [] }) {
   const [filterRating, setFilterRating] = useState('all');
 
-  const filtered = feedbacks.filter((f) => {
-    if (filterRating === 'all') return true;
-    return String(f.rating) === filterRating;
-  });
+  const filtered = useMemo(() => {
+    if (filterRating === 'all') return feedbacks;
+    return feedbacks.filter((f) => String(f.rating) === filterRating);
+  }, [feedbacks, filterRating]);
 
   return (
     <section className="space-y-4">
-      {/* Section Header & Rating Filter */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -66,7 +117,6 @@ export default function FeedbackBox({ feedbacks = [] }) {
           </p>
         </div>
 
-        {/* Filter Pills */}
         <div className="flex items-center gap-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/90 dark:bg-zinc-900/60 p-1 text-xs">
           <span className="flex items-center gap-1 pl-1.5 text-zinc-500">
             <Filter className="size-3" />
@@ -94,9 +144,7 @@ export default function FeedbackBox({ feedbacks = [] }) {
             <ShieldCheck className="size-6" />
           </div>
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">
-            {feedbacks.length === 0
-              ? 'Belum ada keluhan internal'
-              : 'Tidak ada masukan untuk filter ini'}
+            {feedbacks.length === 0 ? 'Belum ada keluhan internal' : 'Tidak ada masukan untuk filter ini'}
           </h3>
           <p className="mt-1 text-xs text-zinc-500 max-w-sm">
             {feedbacks.length === 0
@@ -105,138 +153,11 @@ export default function FeedbackBox({ feedbacks = [] }) {
           </p>
         </div>
       ) : (
-        <>
-          {/* Mobile Card List (< 768px) */}
-          <div className="space-y-3 md:hidden">
-            {filtered.map((f) => {
-              const cleanPhone = f.customer_whatsapp?.replace(/\D/g, '');
-              const waText = followUpText(f);
-
-              return (
-                <div
-                  key={f.id}
-                  className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-4 shadow-xs space-y-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-500 dark:text-amber-400 border border-amber-500/20">
-                        <Star className="size-3 fill-amber-400 text-amber-400" />
-                        {f.rating}/5
-                      </span>
-                      <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-300 truncate max-w-[150px]">
-                        {f.cards?.store_name || '—'}
-                      </span>
-                      <AttributionChips feedback={f} />
-                    </div>
-                    <span className="text-[11px] text-zinc-500">
-                      {new Date(f.created_at).toLocaleString('id-ID', {
-                        dateStyle: 'short',
-                        timeStyle: 'short',
-                      })}
-                    </span>
-                  </div>
-
-                  <p className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-950/60 p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/50">
-                    {f.feedback_text ? (
-                      `"${f.feedback_text}"`
-                    ) : (
-                      <span className="italic text-zinc-500">
-                        Tidak ada catatan tertulis dari pelanggan.
-                      </span>
-                    )}
-                  </p>
-
-                  {cleanPhone ? (
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-mono">
-                        +{cleanPhone}
-                      </span>
-                      <a
-                        href={`https://wa.me/${cleanPhone}?text=${waText}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/30 px-3 py-1.5 text-xs font-medium text-[#25D366] transition shadow-xs"
-                      >
-                        <PhoneCall className="size-3" />
-                        <span>Hubungi via WA</span>
-                      </a>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-600">Pelanggan tidak mengisi nomor WA.</p>
-                  )}
-                  <SocialProofLink feedback={f} />
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Desktop Table View (>= 768px) */}
-          <div className="hidden md:block overflow-hidden rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40 shadow-xs">
-            <table className="min-w-full text-left text-sm" aria-label="Tabel Feedback Pelanggan">
-              <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/90 dark:bg-zinc-900/90 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                <tr>
-                  <th scope="col" className="px-4 py-3.5">Waktu</th>
-                  <th scope="col" className="px-4 py-3.5">Kartu Toko</th>
-                  <th scope="col" className="px-4 py-3.5">Rating</th>
-                  <th scope="col" className="px-4 py-3.5">Pesan Feedback</th>
-                  <th scope="col" className="px-4 py-3.5 text-right">Aksi Tindak Lanjut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800/80">
-                {filtered.map((f) => {
-                  const cleanPhone = f.customer_whatsapp?.replace(/\D/g, '');
-                  const waText = followUpText(f);
-
-                  return (
-                    <tr key={f.id} className="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30">
-                      <td className="px-4 py-3.5 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
-                        {new Date(f.created_at).toLocaleString('id-ID', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })}
-                      </td>
-                      <td className="px-4 py-3.5 font-medium text-zinc-800 dark:text-zinc-200">
-                        <div>{f.cards?.store_name || '—'}</div>
-                        <AttributionChips feedback={f} />
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-500 dark:text-amber-400 border border-amber-500/20">
-                          <Star className="size-3 fill-amber-400 text-amber-400" />
-                          {f.rating}/5
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 max-w-md text-xs text-zinc-700 dark:text-zinc-300">
-                        {f.feedback_text ? (
-                          <span>{f.feedback_text}</span>
-                        ) : (
-                          <span className="italic text-zinc-400 dark:text-zinc-500">Tidak ada pesan tertulis</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                        <div className="inline-flex flex-col items-end gap-1.5">
-                          {cleanPhone ? (
-                            <a
-                              href={`https://wa.me/${cleanPhone}?text=${waText}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/30 px-3 py-1.5 text-xs font-medium text-[#25D366] transition shadow-xs"
-                            >
-                              <PhoneCall className="size-3" />
-                              <span>Hubungi WA ({cleanPhone})</span>
-                            </a>
-                          ) : (
-                            <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
-                          )}
-                          <SocialProofLink feedback={f} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {filtered.map((f) => (
+            <FeedbackCard key={f.id} feedback={f} />
+          ))}
+        </div>
       )}
     </section>
   );

@@ -10,13 +10,20 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const data = await getClientDashboardData(ctx.profile.merchant_id);
-    return NextResponse.json({
-      daily: data.daily,
-      weekly: data.weekly,
-      peakHours: data.peakHours,
-      kpi: data.kpi,
-    });
+    const data = await getClientDashboardData(ctx.profile.merchant_id, false);
+    return NextResponse.json(
+      {
+        daily: data.daily,
+        weekly: data.weekly,
+        peakHours: data.peakHours,
+        kpi: data.kpi,
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+        },
+      }
+    );
   } catch (error) {
     console.error('[api/dashboard/analytics]', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

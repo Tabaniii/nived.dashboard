@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { ShieldCheck, LogOut, Menu, X, User } from 'lucide-react';
 import { logoutAction } from '@/app/(auth)/actions';
 import ThemeToggle from '@/components/theme/ThemeToggle';
+import DashboardNav from '@/components/shell/DashboardNav';
 
 /**
  * @param {{
@@ -16,7 +15,6 @@ import ThemeToggle from '@/components/theme/ThemeToggle';
  * }} props
  */
 export default function AppShell({ title, nav, email, children }) {
-  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -44,25 +42,7 @@ export default function AppShell({ title, nav, email, children }) {
 
           {/* Desktop Navigation & Actions */}
           <div className="hidden lg:flex lg:items-center lg:gap-4">
-            <nav className="flex items-center gap-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/90 dark:bg-zinc-900/60 p-1" aria-label="Primary Navigation">
-              {nav.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      isActive
-                        ? 'bg-brand-500/15 text-brand-700 dark:text-brand-300 font-semibold shadow-xs'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-200'
-                    } focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
+            <DashboardNav nav={nav} variant="desktop" />
 
             <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" aria-hidden="true" />
 
@@ -106,26 +86,7 @@ export default function AppShell({ title, nav, email, children }) {
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen ? (
           <div className="border-t border-zinc-200 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-950/95 px-4 py-4 lg:hidden shadow-lg">
-            <nav className="flex flex-col gap-1 pb-3" aria-label="Mobile Navigation">
-              {nav.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                      isActive
-                        ? 'bg-brand-500/15 text-brand-700 dark:text-brand-300 font-semibold'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
+            <DashboardNav nav={nav} variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
 
             <div className="border-t border-zinc-200 dark:border-zinc-800/80 pt-3 flex items-center justify-between gap-3">
               {email ? (

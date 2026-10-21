@@ -17,6 +17,8 @@ import { TrendingUp, BarChart2, Clock, Activity } from 'lucide-react';
 
 const fetcher = (url) => fetch(url).then((r) => r.json());
 
+const chartMargin = { top: 8, right: 8, left: -20, bottom: 0 };
+
 const CustomTooltip = ({ active, payload, label, unit = 'taps' }) => {
   if (active && payload && payload.length) {
     return (
@@ -31,8 +33,14 @@ const CustomTooltip = ({ active, payload, label, unit = 'taps' }) => {
   return null;
 };
 
+const TABS = [
+  { id: 'daily', label: 'Harian' },
+  { id: 'weekly', label: 'Mingguan' },
+  { id: 'peak', label: 'Jam Sibuk' },
+];
+
 export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHours }) {
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('daily');
 
   const { data } = useSWR('/api/dashboard/analytics', fetcher, {
     fallbackData: {
@@ -40,7 +48,9 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
       weekly: initialWeekly,
       peakHours: initialPeakHours,
     },
-    refreshInterval: 60_000,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    refreshInterval: 0,
   });
 
   const daily = data?.daily || [];
@@ -49,7 +59,6 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
 
   return (
     <div className="space-y-4">
-      {/* Header & Filter Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -61,77 +70,34 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
           </p>
         </div>
 
-        {/* View Switcher Tabs */}
         <div className="flex items-center gap-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/90 dark:bg-zinc-900/60 p-1 text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveTab('all')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition cursor-pointer ${
-              activeTab === 'all'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-            }`}
-          >
-            Semua
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('daily')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition cursor-pointer ${
-              activeTab === 'daily'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-            }`}
-          >
-            Harian
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('weekly')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition cursor-pointer ${
-              activeTab === 'weekly'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-            }`}
-          >
-            Mingguan
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('peak')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition cursor-pointer ${
-              activeTab === 'peak'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-            }`}
-          >
-            Jam Sibuk
-          </button>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-lg px-2.5 py-1 font-medium transition cursor-pointer ${
+                activeTab === tab.id
+                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Daily Taps Line Chart */}
-        {(activeTab === 'all' || activeTab === 'daily') && (
-          <div
-            className={`rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-4 sm:p-5 shadow-xs transition hover:border-zinc-300 dark:hover:border-zinc-700/80 hover:shadow-sm ${
-              activeTab === 'daily' ? 'lg:col-span-2' : ''
-            }`}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <Activity className="size-3.5 text-brand-600 dark:text-brand-400" />
-                  Daily Taps (28 Hari Terakhir)
-                </h3>
-                <p className="text-[11px] text-zinc-500">Volume kunjungan harian pelanggan</p>
-              </div>
-              <span className="rounded-full bg-brand-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand-700 dark:text-brand-400 border border-brand-500/20">
-                Live Sync
-              </span>
+      <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-4 sm:p-5 shadow-xs">
+        {activeTab === 'daily' && (
+          <>
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <Activity className="size-3.5 text-brand-600 dark:text-brand-400" />
+                Daily Taps (28 Hari Terakhir)
+              </h3>
+              <p className="text-[11px] text-zinc-500">Volume kunjungan harian pelanggan</p>
             </div>
-
             <div className="h-64 w-full">
               {daily.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs text-zinc-400 dark:text-zinc-500">
@@ -139,7 +105,7 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={daily} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <LineChart data={daily} margin={chartMargin}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#71717a" strokeOpacity={0.15} vertical={false} />
                     <XAxis
                       dataKey="date"
@@ -152,46 +118,36 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                         return parts.length === 3 ? `${parts[2]}/${parts[1]}` : val;
                       }}
                     />
-                    <YAxis
-                      stroke="#71717a"
-                      fontSize={10}
-                      allowDecimals={false}
-                      tickLine={false}
-                      axisLine={false}
+                    <YAxis stroke="#71717a" fontSize={10} allowDecimals={false} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      cursor={{ stroke: '#2A53E7', strokeDasharray: '3 3', strokeOpacity: 0.4 }}
+                      content={<CustomTooltip unit="taps" />}
                     />
-                    <Tooltip cursor={{ stroke: '#2A53E7', strokeDasharray: '3 3', strokeOpacity: 0.4 }} content={<CustomTooltip unit="taps" />} />
                     <Line
                       type="monotone"
                       dataKey="count"
                       stroke="#2A53E7"
                       strokeWidth={2.5}
                       dot={false}
+                      isAnimationActive={false}
                       activeDot={{ r: 5, fill: '#608df3', stroke: '#1b2d80', strokeWidth: 2 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               )}
             </div>
-          </div>
+          </>
         )}
 
-        {/* Weekly Volume Bar Chart */}
-        {(activeTab === 'all' || activeTab === 'weekly') && (
-          <div
-            className={`rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-4 sm:p-5 shadow-xs transition hover:border-zinc-300 dark:hover:border-zinc-700/80 hover:shadow-sm ${
-              activeTab === 'weekly' ? 'lg:col-span-2' : ''
-            }`}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <BarChart2 className="size-3.5 text-brand-600 dark:text-brand-400" />
-                  Volume Mingguan
-                </h3>
-                <p className="text-[11px] text-zinc-500">Agregat mingguan untuk pemetaan tren</p>
-              </div>
+        {activeTab === 'weekly' && (
+          <>
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <BarChart2 className="size-3.5 text-brand-600 dark:text-brand-400" />
+                Volume Mingguan
+              </h3>
+              <p className="text-[11px] text-zinc-500">Agregat mingguan untuk pemetaan tren</p>
             </div>
-
             <div className="h-64 w-full">
               {weekly.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs text-zinc-400 dark:text-zinc-500">
@@ -199,7 +155,7 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weekly} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <BarChart data={weekly} margin={chartMargin}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#71717a" strokeOpacity={0.15} vertical={false} />
                     <XAxis
                       dataKey="week"
@@ -208,37 +164,27 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                       tickLine={false}
                       axisLine={{ stroke: '#71717a', strokeOpacity: 0.2 }}
                     />
-                    <YAxis
-                      stroke="#71717a"
-                      fontSize={10}
-                      allowDecimals={false}
-                      tickLine={false}
-                      axisLine={false}
-                    />
+                    <YAxis stroke="#71717a" fontSize={10} allowDecimals={false} tickLine={false} axisLine={false} />
                     <Tooltip cursor={false} content={<CustomTooltip unit="taps" />} />
-                    <Bar dataKey="count" fill="#2A53E7" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                    <Bar dataKey="count" fill="#2A53E7" radius={[6, 6, 0, 0]} maxBarSize={36} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
-          </div>
+          </>
         )}
 
-        {/* Peak Hours Spike Bar Chart */}
-        {(activeTab === 'all' || activeTab === 'peak') && (
-          <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/50 p-4 sm:p-5 shadow-xs transition hover:border-zinc-300 dark:hover:border-zinc-700/80 hover:shadow-sm lg:col-span-2">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <Clock className="size-3.5 text-brand-600 dark:text-brand-400" />
-                  Jam Sibuk / Peak Hours (Makan Siang & Malam)
-                </h3>
-                <p className="text-[11px] text-zinc-500">
-                  Identifikasi jam operasional teramai untuk optimasi staf kasir/waiter
-                </p>
-              </div>
+        {activeTab === 'peak' && (
+          <>
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <Clock className="size-3.5 text-brand-600 dark:text-brand-400" />
+                Jam Sibuk / Peak Hours
+              </h3>
+              <p className="text-[11px] text-zinc-500">
+                Identifikasi jam operasional teramai untuk optimasi staf
+              </p>
             </div>
-
             <div className="h-64 w-full">
               {peakHours.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs text-zinc-400 dark:text-zinc-500">
@@ -246,7 +192,7 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={peakHours} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <BarChart data={peakHours} margin={chartMargin}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#71717a" strokeOpacity={0.15} vertical={false} />
                     <XAxis
                       dataKey="hour"
@@ -256,20 +202,14 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                       axisLine={{ stroke: '#71717a', strokeOpacity: 0.2 }}
                       interval={1}
                     />
-                    <YAxis
-                      stroke="#71717a"
-                      fontSize={10}
-                      allowDecimals={false}
-                      tickLine={false}
-                      axisLine={false}
-                    />
+                    <YAxis stroke="#71717a" fontSize={10} allowDecimals={false} tickLine={false} axisLine={false} />
                     <Tooltip cursor={false} content={<CustomTooltip unit="taps" />} />
-                    <Bar dataKey="count" fill="#608df3" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="count" fill="#608df3" radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

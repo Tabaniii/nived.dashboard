@@ -119,7 +119,9 @@ export async function GET(request) {
         height,
         fonts,
         headers: {
-          'Cache-Control': 'private, no-store',
+          'Cache-Control': searchParams.get('download')
+            ? 'private, no-store'
+            : 'private, max-age=120, stale-while-revalidate=300',
           'Content-Disposition': `${searchParams.get('download') ? 'attachment' : 'inline'}; filename="ulasan-${store.slug}-${feedback.id}-${format}.png"`,
         },
       }

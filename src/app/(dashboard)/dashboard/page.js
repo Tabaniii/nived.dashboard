@@ -1,10 +1,16 @@
 import { Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { Zap, Calendar, Star, ShieldAlert } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
-import TrendCharts from './components/TrendCharts';
 import FeedbackBox from './components/FeedbackBox';
 import WeeklySummary, { WeeklySummarySkeleton } from './components/WeeklySummary';
 import { getClientContext, getClientDashboardData } from './queries';
+
+const TrendCharts = dynamic(() => import('./components/TrendCharts'), {
+  loading: () => (
+    <div className="h-80 animate-pulse rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40" />
+  ),
+});
 
 export const metadata = {
   title: 'Dashboard — Nived Reputation Shield',
@@ -18,32 +24,22 @@ export default async function ClientDashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Welcome Banner */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200/80 dark:border-zinc-800/80 pb-5">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-2xl">
             {ctx.merchant?.business_name || 'Merchant Dashboard'}
           </h2>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Pemilik: <span className="text-zinc-800 dark:text-zinc-300 font-medium">{ctx.merchant?.owner_name}</span> &middot; Status: <span className="text-brand-600 dark:text-brand-400 font-semibold capitalize">{ctx.merchant?.status}</span>
+            Pemilik: <span className="text-zinc-800 dark:text-zinc-300 font-medium">{ctx.merchant?.owner_name}</span> &middot;
+            Status:{' '}
+            <span className="text-brand-600 dark:text-brand-400 font-semibold capitalize">{ctx.merchant?.status}</span>
           </p>
         </div>
       </div>
 
-      {/* KPI Section */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Ringkasan Kinerja">
-        <StatCard
-          label="Taps Hari Ini"
-          value={data.kpi.tapsToday}
-          icon={Zap}
-          hint="Aktivitas tap & scan hari ini"
-        />
-        <StatCard
-          label="Taps Bulan Ini"
-          value={data.kpi.tapsMonth}
-          icon={Calendar}
-          hint="Akumulasi kunjungan bulan ini"
-        />
+        <StatCard label="Taps Hari Ini" value={data.kpi.tapsToday} icon={Zap} hint="Aktivitas tap & scan hari ini" />
+        <StatCard label="Taps Bulan Ini" value={data.kpi.tapsMonth} icon={Calendar} hint="Akumulasi kunjungan bulan ini" />
         <StatCard
           label="Ulasan Positif (4–5★)"
           value={data.kpi.positiveReviews}
@@ -64,14 +60,12 @@ export default async function ClientDashboardPage() {
         <WeeklySummary merchantId={ctx.profile.merchant_id} />
       </Suspense>
 
-      {/* Trend Analytics Section */}
       <TrendCharts
         initialDaily={data.daily}
         initialWeekly={data.weekly}
         initialPeakHours={data.peakHours}
       />
 
-      {/* Private Feedback Box Section */}
       <FeedbackBox feedbacks={data.feedbacks} />
     </div>
   );

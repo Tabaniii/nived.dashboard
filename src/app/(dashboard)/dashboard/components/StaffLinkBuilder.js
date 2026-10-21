@@ -93,7 +93,7 @@ export default function StaffLinkBuilder({ cards = [] }) {
             className="flex items-center gap-1 rounded-lg border border-zinc-300 dark:border-zinc-700/80 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition hover:bg-zinc-100 dark:hover:bg-zinc-800 shadow-xs"
           >
             <QrCode className="size-3.5" />
-            <span>Buat QR & Akrilik</span>
+            <span>Buat QR</span>
           </Link>
         </div>
       </div>

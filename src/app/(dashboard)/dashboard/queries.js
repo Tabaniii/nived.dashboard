@@ -1,10 +1,12 @@
+import { cache } from 'react';
 import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isMissingSchemaError } from '@/lib/db-errors';
 import { buildLeaderboard } from '@/lib/staff-stats';
 import { resolveDateRange } from '@/lib/date-range';
 
-export async function getClientContext() {
+/** Deduped per request — layout + page share one auth/profile round-trip. */
+export const getClientContext = cache(async () => {
   await connection();
   const supabase = await createClient();
   const {
@@ -23,9 +25,9 @@ export async function getClientContext() {
   }
 
   return { user, profile, merchant: profile.merchants };
-}
+});
 
-export async function getClientCards(merchantId) {
+export const getClientCards = cache(async (merchantId) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('cards')
@@ -36,9 +38,13 @@ export async function getClientCards(merchantId) {
 
   if (error) throw error;
   return data || [];
-}
+});
 
-export async function getClientDashboardData(merchantId) {
+/**
+ * @param {string} merchantId
+ * @param {boolean} [includeFeedbacks=true] — pass `false` for analytics-only (lighter)
+ */
+export async function getClientDashboardData(merchantId, includeFeedbacks = true) {
   await connection();
   const supabase = await createClient();
   const cards = await getClientCards(merchantId);
@@ -50,7 +56,7 @@ export async function getClientDashboardData(merchantId) {
       kpi: { tapsToday: 0, tapsMonth: 0, positiveReviews: 0, shieldedComplaints: 0 },
       daily: [],
       weekly: [],
-      peakHours: Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 })),
+      peakHours: Array.from({ length: 24 }, (_, hour) => ({ hour: `${String(hour).padStart(2, '0')}:00`, count: 0 })),
       feedbacks: [],
     };
   }
@@ -62,23 +68,31 @@ export async function getClientDashboardData(merchantId) {
   startOfRange.setDate(startOfRange.getDate() - 27);
   const tapQueryStart = startOfMonth < startOfRange ? startOfMonth : startOfRange;
 
+  const tapsPromise = supabase
+    .from('tap_logs')
+    .select('id, selected_stars, created_at, card_id')
+    .in('card_id', cardIds)
+    .gte('created_at', tapQueryStart.toISOString());
+
+  const complaintsPromise = supabase
+    .from('internal_feedbacks')
+    .select('id', { count: 'exact', head: true })
+    .in('card_id', cardIds)
+    .lte('rating', 3);
+
+  const feedbacksPromise = includeFeedbacks
+    ? supabase
+        .from('internal_feedbacks')
+        .select('*, cards(store_name)')
+        .in('card_id', cardIds)
+        .order('created_at', { ascending: false })
+        .limit(100)
+    : Promise.resolve({ data: [], error: null });
+
   const [tapsResult, feedbacksResult, complaintsResult] = await Promise.all([
-    supabase
-      .from('tap_logs')
-      .select('id, selected_stars, created_at, card_id')
-      .in('card_id', cardIds)
-      .gte('created_at', tapQueryStart.toISOString()),
-    supabase
-      .from('internal_feedbacks')
-      .select('*, cards(store_name)')
-      .in('card_id', cardIds)
-      .order('created_at', { ascending: false })
-      .limit(100),
-    supabase
-      .from('internal_feedbacks')
-      .select('id', { count: 'exact', head: true })
-      .in('card_id', cardIds)
-      .lte('rating', 3),
+    tapsPromise,
+    feedbacksPromise,
+    complaintsPromise,
   ]);
 
   if (tapsResult.error) throw tapsResult.error;

@@ -2,7 +2,7 @@ import { connection } from 'next/server';
 import { Sparkles, Lightbulb } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { createAlertThrottle } from '@/lib/alerts';
-import { generateAndStoreSummary, getLatestSummary, isSummaryStale } from '@/lib/insights/store';
+import { generateAndStoreSummary, getLatestSummary } from '@/lib/insights/store';
 import MigrationNotice from './MigrationNotice';
 import RefreshSummaryButton from './RefreshSummaryButton';
 
@@ -61,7 +61,8 @@ export default async function WeeklySummary({ merchantId }) {
 
   if (needsMigration) return <MigrationNotice feature="Ringkasan AI mingguan" />;
 
-  if (isSummaryStale(summary) && autoGenerateThrottle.allow(merchantId, 'auto')) {
+  // Auto-generate only when nothing exists yet (avoid blocking page on every visit).
+  if (!summary && autoGenerateThrottle.allow(merchantId, 'auto')) {
     try {
       summary = await generateAndStoreSummary(merchantId);
     } catch (err) {

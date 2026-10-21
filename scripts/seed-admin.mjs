@@ -10,8 +10,8 @@ import { createClient } from '@supabase/supabase-js';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const email = process.env.ADMIN_EMAIL || 'admin@nived.id';
-const password = process.env.ADMIN_PASSWORD || 'ChangeMeNow!123';
+const email = process.env.ADMIN_EMAIL || 'nived.labs@gmail.com';
+const password = process.env.ADMIN_PASSWORD || 'nived!zyx';
 const fullName = process.env.ADMIN_FULL_NAME || 'Nived Admin';
 
 if (!url || !serviceKey || url.includes('your-project')) {

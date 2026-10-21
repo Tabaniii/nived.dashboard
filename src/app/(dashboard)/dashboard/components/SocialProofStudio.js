@@ -15,10 +15,21 @@ export default function SocialProofStudio({ reviews = [], initialReviewId = '' }
     reviews.some((r) => String(r.id) === String(initialReviewId)) ? String(initialReviewId) : String(reviews[0]?.id || '')
   );
   const [format, setFormat] = useState('story');
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const selected = reviews.find((r) => String(r.id) === selectedId);
   const activeFormat = FORMATS.find((f) => f.id === format);
   const imageSrc = selected ? `/api/dashboard/social-card?feedback_id=${selected.id}&format=${format}` : null;
+
+  function selectReview(id) {
+    setImgLoaded(false);
+    setSelectedId(id);
+  }
+
+  function selectFormat(next) {
+    setImgLoaded(false);
+    setFormat(next);
+  }
 
   return (
     <section id="social-proof" className="scroll-mt-24 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40 p-5 sm:p-6 shadow-xs space-y-5">
@@ -46,7 +57,7 @@ export default function SocialProofStudio({ reviews = [], initialReviewId = '' }
                   <button
                     type="button"
                     aria-pressed={active}
-                    onClick={() => setSelectedId(String(review.id))}
+                    onClick={() => selectReview(String(review.id))}
                     className={`w-full text-left rounded-xl border p-3 transition cursor-pointer ${
                       active
                         ? 'border-brand-500/60 bg-brand-500/10 ring-2 ring-brand-500/20'
@@ -79,7 +90,7 @@ export default function SocialProofStudio({ reviews = [], initialReviewId = '' }
                   key={option.id}
                   type="button"
                   aria-pressed={format === option.id}
-                  onClick={() => setFormat(option.id)}
+                  onClick={() => selectFormat(option.id)}
                   className={`flex-1 rounded-lg px-2.5 py-1 font-medium transition cursor-pointer ${
                     format === option.id
                       ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold'
@@ -94,10 +105,16 @@ export default function SocialProofStudio({ reviews = [], initialReviewId = '' }
             <div
               className={`relative mx-auto overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950 shadow-sm ${activeFormat.aspect} ${activeFormat.width}`}
             >
-              <Loader2 className="absolute inset-0 m-auto size-5 animate-spin text-brand-500" />
+              {!imgLoaded && <Loader2 className="absolute inset-0 m-auto size-5 animate-spin text-brand-500" />}
               {imageSrc && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={imageSrc} src={imageSrc} alt="Preview social proof" className="relative size-full object-cover" />
+                <img
+                  key={imageSrc}
+                  src={imageSrc}
+                  alt="Preview social proof"
+                  className={`relative size-full object-cover transition-opacity ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  onLoad={() => setImgLoaded(true)}
+                />
               )}
             </div>
 
