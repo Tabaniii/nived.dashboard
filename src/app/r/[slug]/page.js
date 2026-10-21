@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { after } from 'next/server';
+import { after, connection } from 'next/server';
 import { redirect } from 'next/navigation';
 import { getCardBySlug } from '@/lib/db';
 import { queueTapTelemetry } from '@/lib/logger';
@@ -51,6 +51,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function CardRoutePage({ params, searchParams }) {
+  await connection();
   const { slug } = await params;
   const query = (await searchParams) || {};
 
