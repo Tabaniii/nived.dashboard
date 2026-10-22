@@ -52,11 +52,11 @@ export async function proxy(request) {
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role, merchant_id, merchants(status)')
+      .select('role, merchant_id, is_active, merchants(status)')
       .eq('id', user.id)
       .maybeSingle();
 
-    role = profile?.role ?? null;
+    role = profile?.is_active ? profile.role : null;
     merchantStatus = profile?.merchants?.status ?? null;
   }
 
@@ -69,7 +69,7 @@ export async function proxy(request) {
     pathname.startsWith('/api/admin') ||
     pathname === '/api/auth/me';
 
-  if (!user && (isDashboard || isAdmin || isProtectedApi)) {
+  if ((!user || !['admin', 'client'].includes(role)) && (isDashboard || isAdmin || isProtectedApi)) {
     if (isProtectedApi) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -85,7 +85,7 @@ export async function proxy(request) {
     }
   }
 
-  if (user && isAuthPage) {
+  if (user && ['admin', 'client'].includes(role) && isAuthPage) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = role === 'admin' ? '/admin' : '/dashboard';
     return NextResponse.redirect(redirectUrl);

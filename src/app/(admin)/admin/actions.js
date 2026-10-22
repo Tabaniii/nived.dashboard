@@ -57,11 +57,8 @@ export async function provisionMerchantAction(formData) {
     email,
     password,
     email_confirm: true,
-    user_metadata: {
-      role: 'client',
-      full_name: ownerName,
-      merchant_id: merchant.id,
-    },
+    user_metadata: { full_name: ownerName },
+    app_metadata: { role: 'client', merchant_id: merchant.id },
   });
 
   if (userError) {

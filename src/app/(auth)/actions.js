@@ -26,13 +26,13 @@ export async function loginAction(formData) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, merchant_id, merchants(status)')
+    .select('role, merchant_id, is_active, merchants(status)')
     .eq('id', data.user.id)
     .maybeSingle();
 
-  if (!profile) {
+  if (!profile?.is_active || !['admin', 'client'].includes(profile?.role)) {
     await supabase.auth.signOut();
-    return { error: 'Profil tidak ditemukan. Hubungi Nived.' };
+    return { error: 'Akun tidak memiliki akses dashboard. Staf POS harus masuk melalui halaman login POS.' };
   }
 
   if (profile.role === 'client') {

@@ -102,9 +102,9 @@ export async function getAdminProfile() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email, role, full_name')
+    .select('id, email, role, full_name, is_active')
     .eq('id', user.id)
     .maybeSingle();
 
-  return profile?.role === 'admin' ? profile : null;
+  return profile?.is_active && profile?.role === 'admin' ? profile : null;
 }

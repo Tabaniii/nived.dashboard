@@ -38,14 +38,14 @@ export async function POST(request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, merchant_id, merchants(status)')
+    .select('role, merchant_id, is_active, merchants(status)')
     .eq('id', data.user.id)
     .maybeSingle();
 
-  if (!profile) {
+  if (!profile?.is_active || !['admin', 'client'].includes(profile?.role)) {
     await supabase.auth.signOut();
     return NextResponse.json(
-      { error: 'Profil tidak ditemukan. Hubungi Nived.' },
+      { error: 'Akun tidak memiliki akses dashboard. Staf POS harus masuk melalui halaman login POS.' },
       { status: 403 }
     );
   }

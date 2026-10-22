@@ -13,11 +13,11 @@ export async function getSessionProfile() {
 
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, email, role, full_name, merchant_id')
+    .select('id, email, role, full_name, merchant_id, outlet_id, is_active')
     .eq('id', user.id)
     .maybeSingle();
 
-  if (error || !profile) return null;
+  if (error || !profile || !profile.is_active) return null;
 
   return { user, profile };
 }

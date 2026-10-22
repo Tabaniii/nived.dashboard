@@ -9,6 +9,9 @@ const nav = [
   { href: '/admin', label: 'Overview' },
   { href: '/admin/merchants', label: 'Merchants' },
   { href: '/admin/cards', label: 'Cards' },
+  { href: '/admin/outlets', label: 'Outlets' },
+  { href: '/admin/employees', label: 'Employees' },
+  { href: '/admin/pos', label: 'POS performance' },
   { href: '/admin/telemetry', label: 'Telemetry' },
 ];
 
