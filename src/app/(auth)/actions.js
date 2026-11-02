@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getLoginError } from '@/lib/auth/login-error';
 
 /**
  * @param {FormData} formData
@@ -21,7 +22,7 @@ export async function loginAction(formData) {
   });
 
   if (error) {
-    return { error: 'Email atau password salah.' };
+    return { error: getLoginError(error).error };
   }
 
   const { data: profile } = await supabase

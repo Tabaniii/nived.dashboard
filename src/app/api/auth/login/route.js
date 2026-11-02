@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getLoginError } from '@/lib/auth/login-error';
 
 export const instant = false;
 
@@ -33,7 +34,8 @@ export async function POST(request) {
   });
 
   if (error) {
-    return NextResponse.json({ error: 'Email atau password salah.' }, { status: 401 });
+    const failure = getLoginError(error);
+    return NextResponse.json({ error: failure.error }, { status: failure.status });
   }
 
   const { data: profile } = await supabase

@@ -211,6 +211,8 @@ Salin file `.env.example` menjadi `.env.local`:
 cp .env.example .env.local
 ```
 
+Next.js memprioritaskan `.env.local` di atas `.env`. Jika kredensial Supabase sudah disimpan di `.env`, hapus duplikat variabel Supabase dari `.env.local` agar perubahan `.env` tidak tertimpa konfigurasi lama. URL dan kedua API key harus berasal dari project Supabase yang sama. Restart `npm run dev` setelah mengubah konfigurasi jika perubahan belum terbaca.
+
 Isi konfigurasi berikut sesuai dengan kredensial Supabase Anda:
 ```env
 # Supabase Configuration
