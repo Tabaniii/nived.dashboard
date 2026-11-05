@@ -4,6 +4,7 @@ import { Trophy, Users, LayoutGrid, Zap } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import MigrationNotice from '../components/MigrationNotice';
 import StaffLinkBuilder from '../components/StaffLinkBuilder';
+import QrStudio from '../components/QrStudio';
 import { getClientContext, getStaffPerformance } from '../queries';
 import { DATE_RANGES } from '@/lib/date-range';
 
@@ -97,12 +98,18 @@ function staffName(code) {
     .join(' ');
 }
 
+function param(value) {
+  return typeof value === 'string' ? value : '';
+}
+
 export default async function StaffPerformancePage({ searchParams }) {
   const ctx = await getClientContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/login');
+  if (!ctx.merchant) return null;
 
-  const { range } = await searchParams;
-  const data = await getStaffPerformance(ctx.profile.merchant_id, typeof range === 'string' ? range : 'month');
+  const query = await searchParams;
+  const { range } = query;
+  const data = await getStaffPerformance(ctx.merchant.id, typeof range === 'string' ? range : 'month');
   const topPerformer = data.staff.find((row) => row.positive > 0);
   const tablesByComplaints = [...data.tables].sort(
     (a, b) => b.complaintCount - a.complaintCount || b.negative - a.negative || b.taps - a.taps
@@ -165,8 +172,18 @@ export default async function StaffPerformancePage({ searchParams }) {
 
       <StaffLinkBuilder cards={data.cards} />
 
+      <div id="qr-code">
+        <QrStudio
+          key={JSON.stringify([param(query.card), param(query.staff), param(query.meja)])}
+          cards={data.cards.map(({ id, slug, store_name }) => ({ id, slug, store_name }))}
+          initialCardId={param(query.card)}
+          initialStaff={param(query.staff)}
+          initialTable={param(query.meja)}
+        />
+      </div>
+
       <p className="text-[11px] text-zinc-500">
-        Rating dihitung dari bintang yang dipilih pelanggan setelah tap. Keluhan tertulis = masukan 1–3★ yang dikirim lewat kotak masukan.
+        Kolom rating menampilkan data historis dari formulir lama. Masukan pribadi baru tersedia di Reputation & Feedback Hub.
       </p>
     </div>
   );

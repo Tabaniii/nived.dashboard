@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { detectThemes, getTimeBucket, buildRuleBasedSummary } from '@/lib/insights/themes';
-import { parseGeminiSummary } from '@/lib/insights/gemini';
+import { buildSummaryPrompt, parseGeminiSummary } from '@/lib/insights/gemini';
 import { generateFeedbackSummary } from '@/lib/insights/summary';
 
 // 05:30Z = 12:30 WIB (lunch), 12:00Z = 19:00 WIB (evening)
@@ -114,6 +114,23 @@ describe('parseGeminiSummary', () => {
     expect(() => parseGeminiSummary({})).toThrow();
     expect(() => parseGeminiSummary(wrap('{"themes":[]}'))).toThrow();
   });
+
+  it('keeps customer contact details out of the Gemini input', () => {
+    const payload = buildSummaryPrompt([{
+      category: 'Kecepatan Pelayanan',
+      feedback_text: 'Pesanan lama. Hubungi +62 812-3456-7890 atau pelanggan@example.com.',
+      customer_contact: '628999999999',
+      table_number: '3',
+    }], { storeName: 'Kopi Pagi' });
+
+    expect(JSON.parse(payload)).toEqual({
+      storeName: 'Kopi Pagi',
+      feedback: [{
+        category: 'Kecepatan Pelayanan',
+        feedback: 'Pesanan lama. Hubungi [nomor] atau [email].',
+      }],
+    });
+  });
 });
 
 describe('generateFeedbackSummary', () => {
@@ -181,5 +198,19 @@ describe('generateFeedbackSummary', () => {
     });
     expect(called).toBe(false);
     expect(result.source).toBe('rules');
+  });
+
+  it('returns the private feedback fallback without asking Gemini for an empty week', async () => {
+    let called = false;
+    const result = await generateFeedbackSummary([], {
+      storeName: 'Kopi Pagi',
+      env: { GEMINI_API_KEY: 'test-key' },
+      fetchImpl: async () => { called = true; },
+    });
+
+    expect(called).toBe(false);
+    expect(result.summary).toBe(
+      'Belum ada kritik privat meja yang masuk minggu ini. Semua operasional meja terpantau aman.'
+    );
   });
 });

@@ -18,7 +18,7 @@ export default async function AdminCardsPage() {
           Manajemen Kartu Fisik NFC
         </h2>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          Provision slug kartu baru, generate QR code untuk pencetakan, dan atur mode Shield vs Direct per kartu.
+          Terbitkan kartu baru dan buat QR untuk halaman ulasan Google dan masukan pribadi.
         </p>
       </div>
 

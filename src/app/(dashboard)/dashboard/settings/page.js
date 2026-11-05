@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import SettingsForm from '../components/SettingsForm';
 import { getClientContext, getClientCards } from '../queries';
 import { getNotifyStatus } from '@/lib/notify';
@@ -10,7 +11,9 @@ export const instant = false;
 
 export default async function DashboardSettingsPage() {
   const ctx = await getClientContext();
-  const cards = await getClientCards(ctx.profile.merchant_id);
+  if (!ctx) redirect('/login');
+  if (!ctx.merchant) return null;
+  const cards = await getClientCards(ctx.merchant.id);
 
   return (
     <div className="space-y-6">
@@ -19,7 +22,7 @@ export default async function DashboardSettingsPage() {
           Pengaturan Toko
         </h2>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          Kelola Google Review URL, nomor WhatsApp manager, dan alert rating jelek untuk masing-masing kartu NFC Anda.
+          Kelola informasi toko, logo, dan pengiriman ringkasan mingguan untuk kartu NFC Anda.
         </p>
       </div>
 

@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { unstable_rethrow } from 'next/navigation';
 import QRCode from 'qrcode';
+import { getClientContext } from '@/app/(dashboard)/dashboard/queries';
 import { createClient } from '@/lib/supabase/server';
 import { cardPublicUrl } from '@/lib/slug';
 import { buildAttributedUrl, parseAttribution } from '@/lib/attribution';
@@ -8,6 +9,7 @@ import { getStoreInitials } from '@/lib/store-initials';
 import { isValidUUID } from '@/lib/validation';
 import { fetchImageAsDataUrl, loadOgFonts } from '@/lib/og/assets';
 import { LogoBadge, NfcIcon, StarRow } from '@/lib/og/elements';
+import { dashboardHeaders, dashboardJson } from '../access';
 
 export const instant = false;
 
@@ -45,24 +47,34 @@ async function getFonts() {
 
 export async function GET(request) {
   try {
+    const ctx = await getClientContext();
+    if (!ctx) return dashboardJson({ error: 'Unauthorized' }, 401);
+
     const { searchParams } = new URL(request.url);
-    const cardId = searchParams.get('card_id') || '';
-    if (!isValidUUID(cardId)) return new Response('card_id tidak valid', { status: 400 });
+    const cardId = searchParams.get('card_id');
+    const expectedStoreId = searchParams.get('store_id');
+    if (!isValidUUID(cardId)) return dashboardJson({ error: 'card_id tidak valid' }, 400);
+
+    // Admin provisioning can download a specific card from any store.
+    const isSuperadmin = ctx.profile.dashboard_role === 'superadmin';
+    if (!isSuperadmin && (!ctx.merchant || (expectedStoreId !== null && expectedStoreId !== ctx.merchant.id))) {
+      return dashboardJson({ error: 'Store access denied' }, 403);
+    }
 
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return new Response('Unauthorized', { status: 401 });
-
-    const { data: card, error } = await supabase
+    let cardQuery = supabase
       .from('cards')
       .select('id, slug, store_name, logo_url')
-      .eq('id', cardId)
-      .is('deleted_at', null)
-      .maybeSingle();
+      .eq('id', cardId.trim())
+      .is('deleted_at', null);
+    const storeId = isSuperadmin ? expectedStoreId : ctx.merchant.id;
+    if (storeId !== null) {
+      if (!isValidUUID(storeId)) return dashboardJson({ error: 'store_id tidak valid' }, 400);
+      cardQuery = cardQuery.eq('merchant_id', storeId.trim());
+    }
+    const { data: card, error } = await cardQuery.maybeSingle();
     if (error) throw error;
-    if (!card) return new Response('Kartu tidak ditemukan', { status: 404 });
+    if (!card) return dashboardJson({ error: 'Kartu tidak ditemukan' }, 404);
 
     const copy = COPY[searchParams.get('lang') === 'en' ? 'en' : 'id'];
     const attribution = parseAttribution(searchParams);
@@ -91,118 +103,125 @@ export async function GET(request) {
       .filter(Boolean)
       .join('-');
 
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            backgroundColor: '#F4F6FB',
-            fontFamily: 'Plus Jakarta Sans',
-          }}
-        >
-          <div
-            style={{
-              width: '100%',
-              height: 720,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              padding: '96px 80px 0',
-              backgroundImage: `linear-gradient(160deg, ${BRAND} 0%, #1A3BB0 100%)`,
-              color: '#FFFFFF',
-            }}
-          >
-            <LogoBadge logoDataUrl={logoDataUrl} initials={getStoreInitials(card.store_name)} size={150} background="#FFFFFF" color={BRAND} />
-            <div
-              style={{
-                marginTop: 30,
-                fontSize: card.store_name.length > 24 ? 52 : 64,
-                fontWeight: 800,
-                textAlign: 'center',
-                lineHeight: 1.15,
-                maxWidth: 1060,
-              }}
-            >
-              {card.store_name}
-            </div>
-            <div style={{ display: 'flex', marginTop: 30 }}>
-              <StarRow size={58} gap={14} />
-            </div>
-            <div style={{ marginTop: 28, fontSize: 42, fontWeight: 700, opacity: 0.92, textAlign: 'center' }}>
-              {copy.question}
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: -150,
-              display: 'flex',
-              padding: 40,
-              borderRadius: 56,
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 30px 80px rgba(11, 27, 77, 0.18)',
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrDataUrl} alt="" width={600} height={600} />
-          </div>
-
-          <div style={{ marginTop: 60, display: 'flex', alignItems: 'center', gap: 20 }}>
-            <NfcIcon size={70} color={BRAND} />
-            <div style={{ fontSize: 50, fontWeight: 800, color: INK }}>{copy.tap}</div>
-          </div>
-          <div style={{ marginTop: 10, fontSize: 34, color: '#55607A' }}>{copy.scan}</div>
-
-          {attribution.tableCode ? (
-            <div
-              style={{
-                marginTop: 40,
-                display: 'flex',
-                padding: '14px 48px',
-                borderRadius: 999,
-                border: `4px solid ${BRAND}`,
-                color: BRAND,
-                fontSize: 42,
-                fontWeight: 800,
-              }}
-            >
-              {`${copy.table} ${attribution.tableCode}`}
-            </div>
-          ) : null}
-
-          <div
-            style={{
-              marginTop: 'auto',
-              marginBottom: 64,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 8,
-              color: '#8A93A8',
-            }}
-          >
-            <div style={{ fontSize: 28 }}>{copy.footer}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1 }}>Powered by Nived</div>
-          </div>
-        </div>
-      ),
-      {
-        width: WIDTH,
-        height: HEIGHT,
-        fonts,
-        headers: {
-          'Cache-Control': 'private, no-store',
-          'Content-Disposition': `${searchParams.get('download') ? 'attachment' : 'inline'}; filename="${fileName}.png"`,
-        },
-      }
-    );
+    return renderQrTemplate({
+      card, copy, attribution, qrDataUrl, logoDataUrl, fonts, fileName,
+      download: Boolean(searchParams.get('download')),
+    });
   } catch (error) {
     unstable_rethrow(error);
     console.error('[api/dashboard/qr-template]', error);
-    return new Response('Gagal membuat template', { status: 500 });
+    return dashboardJson({ error: 'Gagal membuat template' }, 500);
   }
+}
+
+function renderQrTemplate({ card, copy, attribution, qrDataUrl, logoDataUrl, fonts, fileName, download }) {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          backgroundColor: '#F4F6FB',
+          fontFamily: 'Plus Jakarta Sans',
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            height: 720,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '96px 80px 0',
+            backgroundImage: `linear-gradient(160deg, ${BRAND} 0%, #1A3BB0 100%)`,
+            color: '#FFFFFF',
+          }}
+        >
+          <LogoBadge logoDataUrl={logoDataUrl} initials={getStoreInitials(card.store_name)} size={150} background="#FFFFFF" color={BRAND} />
+          <div
+            style={{
+              marginTop: 30,
+              fontSize: card.store_name.length > 24 ? 52 : 64,
+              fontWeight: 800,
+              textAlign: 'center',
+              lineHeight: 1.15,
+              maxWidth: 1060,
+            }}
+          >
+            {card.store_name}
+          </div>
+          <div style={{ display: 'flex', marginTop: 30 }}>
+            <StarRow size={58} gap={14} />
+          </div>
+          <div style={{ marginTop: 28, fontSize: 42, fontWeight: 700, opacity: 0.92, textAlign: 'center' }}>
+            {copy.question}
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: -150,
+            display: 'flex',
+            padding: 40,
+            borderRadius: 56,
+            backgroundColor: '#FFFFFF',
+            boxShadow: '0 30px 80px rgba(11, 27, 77, 0.18)',
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qrDataUrl} alt="" width={600} height={600} />
+        </div>
+
+        <div style={{ marginTop: 60, display: 'flex', alignItems: 'center', gap: 20 }}>
+          <NfcIcon size={70} color={BRAND} />
+          <div style={{ fontSize: 50, fontWeight: 800, color: INK }}>{copy.tap}</div>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 34, color: '#55607A' }}>{copy.scan}</div>
+
+        {attribution.tableCode ? (
+          <div
+            style={{
+              marginTop: 40,
+              display: 'flex',
+              padding: '14px 48px',
+              borderRadius: 999,
+              border: `4px solid ${BRAND}`,
+              color: BRAND,
+              fontSize: 42,
+              fontWeight: 800,
+            }}
+          >
+            {`${copy.table} ${attribution.tableCode}`}
+          </div>
+        ) : null}
+
+        <div
+          style={{
+            marginTop: 'auto',
+            marginBottom: 64,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 8,
+            color: '#8A93A8',
+          }}
+        >
+          <div style={{ fontSize: 28 }}>{copy.footer}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 1 }}>Powered by Nived</div>
+        </div>
+      </div>
+    ),
+    {
+      width: WIDTH,
+      height: HEIGHT,
+      fonts,
+      headers: {
+        ...dashboardHeaders,
+        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="${fileName}.png"`,
+      },
+    }
+  );
 }

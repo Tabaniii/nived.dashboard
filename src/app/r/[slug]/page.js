@@ -1,19 +1,20 @@
 import { headers } from 'next/headers';
 import { after, connection } from 'next/server';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 import { getCardBySlug } from '@/lib/db';
 import { queueTapTelemetry } from '@/lib/logger';
 import { getClientMeta } from '@/lib/client-meta';
 import { resolveCardAction } from '@/lib/resolve-card-action';
-import { resolveActiveCardMode } from '@/lib/card-mode';
-import { parseAttribution, buildAttributedUrl } from '@/lib/attribution';
+import { parseAttribution } from '@/lib/attribution';
+import { getSavedGoogleReviewDestination, resolveTableNumber } from '@/lib/customer-feedback';
 import { sanitizeReviewUrl } from '@/lib/validation';
 import RatingClientView from '@/app/r/[slug]/RatingClientView';
-import PromoView from '@/app/r/[slug]/PromoView';
-import FallbackView from '@/app/r/[slug]/FallbackView';
 
 /** Allow request-time headers/DB access on this blocking NFC hot path (Next.js cacheComponents). */
 export const instant = false;
+
+const getTapCard = cache(getCardBySlug);
 
 /**
  * Schedule debounced tap telemetry after the response is sent (non-blocking TTFB).
@@ -34,9 +35,9 @@ function scheduleTapTelemetry(meta) {
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const card = await getCardBySlug(slug);
+  const card = await getTapCard(slug);
 
-  if (!card) {
+  if (resolveCardAction(card).type === 'fallback') {
     return {
       title: 'Card not registered',
       description: 'The requested NFC review card is not registered or currently unavailable.',
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }) {
   }
 
   return {
-    title: `${card.store_name} — Rate Your Experience`,
+    title: `${card.store_name} — Bagikan Pengalaman Anda`,
     description: `Share your experience and review for ${card.store_name}.`,
   };
 }
@@ -53,67 +54,30 @@ export async function generateMetadata({ params }) {
 export default async function CardRoutePage({ params, searchParams }) {
   await connection();
   const { slug } = await params;
-  const query = (await searchParams) || {};
+  const [query, headerList, card] = await Promise.all([searchParams, headers(), getTapCard(slug)]);
 
-  const headerList = await headers();
   const { clientIp, userAgent, referrer } = getClientMeta(headerList);
 
   const attribution = parseAttribution(query);
-  const view = Array.isArray(query.view) ? query.view[0] : query.view;
-  const forceReview = view === 'review';
-
-  const card = await getCardBySlug(slug);
-  const action = resolveCardAction(card, { forceReview });
+  const action = resolveCardAction(card);
 
   if (action.type === 'fallback') {
     redirect(`/invalid-card?slug=${encodeURIComponent(slug || '')}`);
   }
 
+  const tableNumber = resolveTableNumber(card.slug, attribution.tableCode);
   const isPrefetch = headerList.has('next-router-prefetch')
     || headerList.get('purpose') === 'prefetch'
     || headerList.get('sec-purpose')?.includes('prefetch');
-  // "Rate your visit" from the promo page is the same visit, not a new tap.
-  const cameFromPromo = forceReview && resolveActiveCardMode(card) === 'promo';
-
-  if (!isPrefetch && !cameFromPromo) {
+  if (!isPrefetch) {
     scheduleTapTelemetry({
       cardId: card.id,
       clientIp,
       userAgent,
       referrer,
       staffCode: attribution.staffCode,
-      tableCode: attribution.tableCode,
+      tableCode: tableNumber,
     });
-  }
-
-  if (action.type === 'mode_redirect') {
-    redirect(action.url);
-  }
-
-  if (action.type === 'direct_redirect') {
-    const destinationUrl = sanitizeReviewUrl(action.url) || action.url;
-    redirect(destinationUrl);
-  }
-
-  if (action.type === 'promo') {
-    return (
-      <PromoView
-        card={{
-          store_name: card.store_name,
-          logo_url: card.logo_url,
-          promo_title: card.promo_title,
-          promo_message: card.promo_message,
-          promo_image_url: sanitizeReviewUrl(card.promo_image_url || ''),
-          promo_cta_label: card.promo_cta_label,
-          promo_url: sanitizeReviewUrl(card.promo_url || ''),
-          mode_until: card.mode_until,
-        }}
-        reviewHref={buildAttributedUrl(`/r/${encodeURIComponent(card.slug)}?view=review`, {
-          staff: attribution.staffCode,
-          table: attribution.tableCode,
-        })}
-      />
-    );
   }
 
   return (
@@ -121,11 +85,17 @@ export default async function CardRoutePage({ params, searchParams }) {
       card={{
         id: card.id,
         store_name: card.store_name,
-        logo_url: card.logo_url,
-        google_review_url: sanitizeReviewUrl(card.google_review_url || ''),
-        whatsapp_number: card.whatsapp_number,
+        logo_url: sanitizeReviewUrl(card.logo_url),
+        google_review_url: getSavedGoogleReviewDestination(card),
       }}
-      attribution={attribution}
+      tableNumber={tableNumber}
+      promo={action.mode === 'review' ? null : {
+        title: action.mode === 'promo' ? card.promo_title : null,
+        message: action.mode === 'promo' ? card.promo_message : null,
+        image: action.mode === 'promo' ? sanitizeReviewUrl(card.promo_image_url) : null,
+        label: card.promo_cta_label,
+        url: sanitizeReviewUrl(card.promo_url),
+      }}
     />
   );
 }

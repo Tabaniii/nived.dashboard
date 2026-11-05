@@ -58,46 +58,22 @@ describe('resolveActiveCardMode', () => {
 });
 
 describe('resolveCardAction with smart modes', () => {
-  it('renders the promo page when promo mode is active', () => {
-    const card = { ...baseCard, card_mode: 'promo', promo_title: 'Menu Baru!' };
-    expect(resolveCardAction(card, { now: NOW })).toEqual({ type: 'promo', card });
+  it.each([
+    ['promo', { promo_title: 'Menu Baru!' }],
+    ['redirect', { promo_url: 'https://wa.me/c/6281234567890' }],
+  ])('keeps both customer choices available in %s mode', (mode, fields) => {
+    const card = { ...baseCard, is_shield_active: false, card_mode: mode, ...fields };
+    expect(resolveCardAction(card, { now: NOW })).toEqual({ type: 'choice', mode });
   });
 
-  it('shows the rating UI for promo cards when the customer asks to review', () => {
-    const card = { ...baseCard, card_mode: 'promo', promo_title: 'Menu Baru!' };
-    expect(resolveCardAction(card, { now: NOW, forceReview: true })).toEqual({
-      type: 'shield_ui',
-      card,
-    });
-  });
-
-  it('redirects with 307 to the promo URL in redirect mode, even for direct-mode cards', () => {
+  it('keeps both choices and removes the promotion when the mode expires', () => {
     const card = {
       ...baseCard,
-      is_shield_active: false,
-      card_mode: 'redirect',
-      promo_url: 'https://wa.me/c/6281234567890',
-    };
-    expect(resolveCardAction(card, { now: NOW })).toEqual({
-      type: 'mode_redirect',
-      url: 'https://wa.me/c/6281234567890',
-      status: 307,
-    });
-  });
-
-  it('keeps the review behaviour for expired modes', () => {
-    const card = {
-      ...baseCard,
-      is_shield_active: false,
       card_mode: 'redirect',
       promo_url: 'https://instagram.com/kopisenja',
       mode_until: '2026-10-01T00:00:00.000Z',
     };
-    expect(resolveCardAction(card, { now: NOW })).toEqual({
-      type: 'direct_redirect',
-      url: 'https://maps.app.goo.gl/demo-review',
-      status: 307,
-    });
+    expect(resolveCardAction(card, { now: NOW })).toEqual({ type: 'choice', mode: 'review' });
   });
 });
 

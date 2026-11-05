@@ -6,7 +6,7 @@ import { loginAction } from './actions';
 
 const initialState = { error: null };
 
-export default function LoginForm({ bannerError }) {
+export default function LoginForm({ bannerError, requestedPath }) {
   const [showPassword, setShowPassword] = useState(false);
   const [state, formAction, pending] = useActionState(
     async (_prev, formData) => loginAction(formData),
@@ -17,6 +17,7 @@ export default function LoginForm({ bannerError }) {
 
   return (
     <form action={formAction} className="mt-8 space-y-4">
+      {requestedPath && <input type="hidden" name="redirect" value={requestedPath} />}
       {error ? (
         <div
           role="alert"

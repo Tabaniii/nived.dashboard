@@ -19,6 +19,8 @@ export async function getLatestSummary(supabase, merchantId) {
     .from('feedback_summaries')
     .select('*')
     .eq('merchant_id', merchantId)
+    .eq('private_feedback_only', true)
+    .order('period_end', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -44,39 +46,43 @@ export function isSummaryStale(summary, now = new Date()) {
  * Uses the service role so it also works from the weekly cron job.
  *
  * @param {string} merchantId
- * @param {{ now?: Date }} [options]
+ * @param {{ now?: Date, includeSuspended?: boolean }} [options]
  */
-export async function generateAndStoreSummary(merchantId, { now = new Date() } = {}) {
+export async function generateAndStoreSummary(merchantId, { now = new Date(), includeSuspended = false } = {}) {
   const admin = createAdminClient();
   const periodStart = new Date(now.getTime() - SUMMARY_PERIOD_DAYS * DAY_MS);
 
-  const { data: cards, error: cardsError } = await admin
-    .from('cards')
-    .select('id, store_name')
-    .eq('merchant_id', merchantId)
-    .is('deleted_at', null);
-  if (cardsError) throw cardsError;
+  let storeQuery = admin
+    .from('merchants')
+    .select('business_name')
+    .eq('id', merchantId);
+  if (!includeSuspended) storeQuery = storeQuery.in('status', ['active', 'trial']);
+  const { data: store, error: storeError } = await storeQuery.maybeSingle();
+  if (storeError) throw storeError;
+  if (!store) return null;
 
-  const cardIds = (cards || []).map((card) => card.id);
-  let feedbacks = [];
-  if (cardIds.length) {
+  const feedbacks = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await admin
-      .from('internal_feedbacks')
-      .select('*')
-      .in('card_id', cardIds)
+      .from('customer_feedback')
+      .select('category, feedback_text, table_number, sentiment_tag, created_at')
+      .eq('store_id', merchantId)
       .gte('created_at', periodStart.toISOString())
+      .lte('created_at', now.toISOString())
       .order('created_at', { ascending: false })
-      .limit(500);
+      .order('id', { ascending: false })
+      .range(offset, offset + pageSize - 1);
     if (error) throw error;
-    feedbacks = data || [];
+    feedbacks.push(...data);
+    if (data.length < pageSize) break;
   }
 
-  const result = await generateFeedbackSummary(feedbacks, {
-    storeNames: (cards || []).map((card) => card.store_name),
-  });
+  const result = await generateFeedbackSummary(feedbacks, { storeName: store.business_name || 'Toko Anda' });
 
   const row = {
     merchant_id: merchantId,
+    private_feedback_only: true,
     period_start: periodStart.toISOString(),
     period_end: now.toISOString(),
     feedback_count: result.feedbackCount,

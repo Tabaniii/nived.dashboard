@@ -1,6 +1,6 @@
-# 🛡️ Nived NFC & QR Smart Reputation Shield (`filter-rating`)
+# 🛡️ Nived NFC & QR Reputation Hub (`filter-rating`)
 
-Sistem perutean dinamis (*dynamic routing*), telemetri, dan manajemen reputasi cerdas (*smart reputation shield*) berbasis **NFC (NTAG215)** dan **QR Code** untuk bisnis lokal dan *merchant*.
+Halaman pelanggan, telemetri klik ulasan, dan masukan pribadi berbasis **NFC (NTAG215)** dan **QR Code** untuk bisnis lokal dan *merchant*.
 
 Aplikasi ini dibangun menggunakan **Next.js 16 (App Router)**, **React 19**, **Supabase (PostgreSQL & Auth)**, **Tailwind CSS v4**, dan **Recharts**.
 
@@ -9,9 +9,6 @@ Aplikasi ini dibangun menggunakan **Next.js 16 (App Router)**, **React 19**, **S
 ## 📋 Daftar Isi
 
 - [Arsitektur & Cara Kerja](#-arsitektur--cara-kerja)
-  - [1. Shield Mode (Proteksi Ulasan)](#1-shield-mode-default---proteksi-ulasan)
-  - [2. Direct Mode (Bypass ke Google)](#2-direct-mode-bypass-langsung)
-  - [3. Invalid / Inactive Card Fallback](#3-invalid--inactive-card-fallback)
 - [Fitur Utama](#-fitur-utama)
 - [Tech Stack](#-tech-stack)
 - [Struktur Direktori Proyek](#-struktur-direktori-proyek)
@@ -32,36 +29,12 @@ Aplikasi ini dibangun menggunakan **Next.js 16 (App Router)**, **React 19**, **S
 
 ## 🧠 Arsitektur & Cara Kerja
 
-Sistem ini menghubungkan interaksi fisik kartu NFC / scan QR meja kasir dengan reputasi online Google Maps melalui dua mode:
+Pelanggan yang membuka `/r/[slug]` dari NFC atau QR melihat nama toko, logo, dan nomor meja jika tersedia. Halaman yang sama menawarkan dua pilihan berikut.
 
-```
-[ Pelanggan Tap Kartu NFC / Scan QR ]
-                 │
-                 ▼
-       GET /r/[slug] (Perutean Dinamis)
-                 │
-      ┌──────────┴──────────┐
-      ▼                     ▼
-[ Shield Active ]     [ Shield Inactive (Direct) ]
-      │                     │
-      │                     └─► HTTP 307 Langsung ke Google Review Modal
-      │
-      ├─► Bintang 5 ───────► Redirect ke Google Review Modal
-      │
-      └─► Bintang 1 - 4 ───► Formulir Masukan Privat (Internal Feedback)
-                             └─► Tersimpan aman di DB & opsi chat WhatsApp Merchant
-```
+- **Beri Ulasan di Google Maps** membuka tautan ulasan toko di tab baru. Aplikasi mencatat klik di latar belakang.
+- **Kritik & Masukan ke Manajemen** membuka formulir pribadi dengan kategori, isi masukan, dan nomor WhatsApp opsional.
 
-### 1. Shield Mode (Default - Proteksi Ulasan)
-- Ketika pelanggan melakukan *tap*, halaman penilaian bintang interaktif akan ditampilkan.
-- **Rating 5 Bintang:** Pelanggan diarahkan langsung ke Google Business Profile Review Intent link untuk memberikan ulasan publik 5 bintang.
-- **Rating 1–4 Bintang:** Pelanggan diarahkan ke formulir masukan internal (*private feedback*). Keluhan pelanggan ditampung secara privat ke basis data internal tanpa mencemari rating publik di Google, dilengkapi tombol follow-up cepat via WhatsApp pemilik toko.
-
-### 2. Direct Mode (Bypass Langsung)
-- Jika opsi `is_shield_active = false`, perutean `/r/[slug]` langsung mengembalikan HTTP 307 Temporary Redirect ke URL Google Review tanpa menampilkan antarmuka web perantara.
-
-### 3. Invalid / Inactive Card Fallback
-- Kartu yang belum terdaftar atau berstatus nonaktif akan otomatis diarahkan ke `/invalid-card?slug=[slug]` dengan status kode HTTP 307.
+Tautan Google selalu tersedia saat kartu memiliki tujuan Google yang valid. Promo dan tautan tambahan muncul di bawah kedua pilihan. Kartu yang tidak tersedia mengarahkan pengunjung ke `/invalid-card`.
 
 ---
 
@@ -72,25 +45,23 @@ Sistem ini menghubungkan interaksi fisik kartu NFC / scan QR meja kasir dengan r
   - Mendeteksi jenis sistem operasi pengguna (`iOS`, `Android`, `Desktop`, `Other`).
   - Hashing anonim IP (`SHA-256`) dengan *window rate-limiting/debouncing* untuk mencegah manipulasi perhitungan tap ganda secara instan.
 - 🏢 **Multi-Role Authentication & Dashboard:**
-  - **Portal Admin (`/admin`):** Manajemen kartu fisik, pembuatan merchant, konfigurasi slug URL, aktivasi shield, dan generator QR Code cetak.
+  - **Portal Admin (`/admin`):** Manajemen kartu fisik, pembuatan merchant, konfigurasi slug URL dan generator QR Code cetak.
   - **Dashboard Merchant (`/dashboard`):** Analitik interaktif (total tap, distribusi rating bintang, grafik perangkat, tren waktu nyata) dan daftar masukan privat pelanggan.
 - 🎯 **Validasi Google Review Intent Link:**
-  - Mendukung tautan langsung modal review Google:
+  - Pengaturan kartu menerima dua format tautan langsung ulasan Google.
     - `https://g.page/r/[code]/review`
     - `https://search.google.com/local/writereview?placeid=[place_id]`
-    - `https://maps.app.goo.gl/...`
 - 📱 **Generator QR Code Dinamis:**
   - Menghasilkan QR Code SVG dan PNG resolusi tinggi secara instan dari dashboard untuk kebutuhan cetak akrilik/stiker meja.
 
-### Fitur Growth (butuh migrasi `20261015000000_growth_features.sql`)
+### Fitur Merchant
 
-- 🔔 **Alert instan rating 1–3★** ke WhatsApp (Fonnte) dan/atau Telegram, dikirim setelah respons (pelanggan tidak menunggu). Anti-spam: 1 alert/menit per pengunjung dan maks 20/jam per kartu. Atur di **Settings → Alert Instan**, lengkap dengan tombol **Kirim Tes**.
-- ✍️ **Alur 4–5★ dengan kotak cerita:** pelanggan boleh menulis pengalaman (opsional). Teks disimpan sebagai social proof dan otomatis disalin agar tinggal ditempel di Google. Tidak ada insentif/voucher, sesuai kebijakan ulasan Google.
-- 👤 **Tracking staf & meja:** tambahkan `?staff=andi&meja=12` di link kartu/QR. Halaman **Staff & Meja** menampilkan leaderboard staf dan meja yang paling sering dikeluhkan.
-- 🤖 **Ringkasan AI mingguan** (Google Gemini, fallback analisis aturan bila `GEMINI_API_KEY` kosong) di Overview, plus digest WA/Telegram tiap Senin 08:00 WIB via Vercel Cron (`/api/cron/weekly-summary`).
-- 🔀 **Smart Mode Switcher:** halaman **Mode Kartu** untuk ganti kartu ke mode Review / Promo / Redirect dengan batas waktu, tanpa mengganti link NFC. `/r/[slug]?view=review` selalu membuka halaman rating.
-- 🖨️ **Template akrilik A6 (1240×1748, 300 dpi)** dengan logo, QR, dan nomor meja: halaman **Promosi** atau tombol di modal QR admin.
-- 📸 **Social proof generator:** ulasan 5★ bertulisan → PNG IG Story (1080×1920) / Post (1080×1080) dengan logo toko.
+- **Reputation & Feedback Hub** (`/dashboard/reviews-feedback`) menampilkan klik tautan Google selama tujuh hari terakhir, jumlah masukan pribadi, dan daftar masukan dengan status penyelesaian.
+- **Ringkasan mingguan** merangkum masukan tujuh hari terakhir. Pemilik dapat membuat ulang ringkasan dan menyalin pesan untuk WhatsApp. Vercel Cron membuat ringkasan setiap Senin pukul 08.00 WIB.
+- **Tracking staf & meja:** tambahkan `?staff=andi&meja=12` di link kartu/QR. Nomor pada slug seperti `kopi-senja-meja-12` juga dikenali.
+- **Link Google Maps** (`/dashboard/review-link`) mengatur tautan langsung ulasan Google untuk seluruh kartu toko tanpa mengganti tautan NFC.
+- **QR kartu** tersedia di **Staff & Meja** untuk diunduh sebagai PNG dengan kode staf/meja opsional.
+- 🖨️ **Template akrilik A6 (1240×1748, 300 dpi)** dengan logo, QR, dan nomor meja tersedia melalui modal QR admin.
 
 ---
 
@@ -98,7 +69,7 @@ Sistem ini menghubungkan interaksi fisik kartu NFC / scan QR meja kasir dengan r
 
 | Layer | Teknologi | Versi |
 |---|---|---|
-| **Framework** | [Next.js](https://nextjs.org/) (App Router, Turbopack) | `16.4.0` |
+| **Framework** | [Next.js](https://nextjs.org/) (App Router, Turbopack) | `16.4.3` |
 | **UI Library** | [React](https://react.dev/) | `19.3.0` |
 | **Styling** | [Tailwind CSS](https://tailwindcss.com/) & [@tailwindcss/turbopack](https://tailwindcss.com/) | `v4` |
 | **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL + RLS + Auth) | `@supabase/ssr` `^0.12.7` |
@@ -139,7 +110,7 @@ filter-rating/
 │       ├── validation.js   # Sanitasi & validasi Google Review URL
 │       ├── device.js       # Parser OS perangkat (iOS / Android / Desktop)
 │       ├── debounce.js     # IP hashing & rate-limiting tap
-│       ├── resolve-card-action.js # Logika perutean (Shield vs Direct vs 404)
+│       ├── resolve-card-action.js # Menentukan ketersediaan dan promo kartu
 │       └── supabase/       # Client Supabase SSR & service-role
 ├── supabase/
 │   └── migrations/         # File migrasi database SQL bertahap
@@ -159,14 +130,13 @@ filter-rating/
 Database menggunakan **PostgreSQL (Supabase)** dengan tabel-tabel utama berikut:
 
 ### 1. `cards`
-Menyimpan identitas kartu fisik, konfigurasi toko, dan mode proteksi.
+Menyimpan identitas kartu fisik, konfigurasi toko, dan konten tambahan.
 - `id` (UUID, Primary Key)
 - `slug` (VARCHAR(100), Unique, Indexed)
 - `store_name` (VARCHAR(255))
 - `logo_url` (TEXT, Opsional)
 - `google_review_url` (TEXT): Tautan langsung ke modal review Google Bisnis.
 - `whatsapp_number` (VARCHAR(30)): Nomor WhatsApp toko untuk menerima komplain/masukan.
-- `is_shield_active` (BOOLEAN, Default: `true`): Penentu mode *Shield* atau *Direct*.
 
 ### 2. `tap_logs`
 Mencatat analitik setiap kali kartu disentuh atau QR discan.
@@ -179,13 +149,17 @@ Mencatat analitik setiap kali kartu disentuh atau QR discan.
 - `created_at` (TIMESTAMPTZ)
 
 ### 3. `internal_feedbacks`
-Menampung ulasan privat bintang 1–4 dari pelanggan.
+Menyimpan arsip dari formulir rating lama.
 - `id` (BIGSERIAL, Primary Key)
 - `card_id` (UUID, FK -> `cards.id`)
 - `rating` (INT 1-5)
 - `feedback_text` (TEXT)
 - `customer_whatsapp` (VARCHAR(30), Opsional)
 - `created_at` (TIMESTAMPTZ)
+
+### 4. `customer_feedback` dan `review_click_events`
+
+Menyimpan masukan pribadi dan klik tautan Google per merchant dan meja. Klien publik dapat menambahkan data. Pemilik toko dapat membaca data tokonya dan mengubah status penyelesaian masukan.
 
 ---
 
@@ -228,14 +202,14 @@ ADMIN_EMAIL=admin@nived.id
 ADMIN_PASSWORD=PasswordKuatAnda123!
 ADMIN_FULL_NAME="Nived Administrator"
 
-# Opsional — alert rating jelek & digest mingguan
+# Opsional — pengiriman otomatis ke tujuan yang sudah dikonfigurasi
 FONNTE_TOKEN=token-device-fonnte
 TELEGRAM_BOT_TOKEN=123456:ABC-token-dari-BotFather
 TELEGRAM_BOT_USERNAME=NamaBotAnda
 
 # Opsional — ringkasan AI mingguan
 GEMINI_API_KEY=kunci-dari-aistudio.google.com
-GEMINI_MODEL=gemini-flash-latest
+GEMINI_MODEL=gemini-3.5-flash-lite
 
 # Wajib untuk cron mingguan di Vercel
 CRON_SECRET=string-acak-panjang
@@ -246,15 +220,30 @@ CRON_SECRET=string-acak-panjang
 ### 4. Setup Database Supabase
 Jalankan skrip migrasi database di Supabase SQL Editor:
 1. Buka dashboard proyek Supabase Anda -> **SQL Editor**.
-2. Salin dan jalankan isi file [`schema.sql`](file:///Users/tabaniii/Herd/filter-rating/schema.sql) atau migrasi di folder [`supabase/migrations/`](file:///Users/tabaniii/Herd/filter-rating/supabase/migrations/).
-3. Skrip akan membuat tabel `cards`, `tap_logs`, `internal_feedbacks`, indeks penelusuran, serta sample seed data untuk pengujian lokal.
-4. Untuk fitur growth, jalankan juga [`supabase/migrations/20261015000000_growth_features.sql`](supabase/migrations/20261015000000_growth_features.sql). Migrasi ini hanya menambah kolom/tabel (aman dijalankan ulang). Sebelum dijalankan, aplikasi tetap berjalan dan dashboard menampilkan pengingat migrasi.
+2. Untuk database kosong, jalankan [`schema.sql`](schema.sql) atau jalankan file di [`supabase/migrations/`](supabase/migrations/) sesuai urutan.
+3. Untuk proyek yang sudah memiliki tabel dashboard dan fitur growth, jalankan [migrasi Reputation & Feedback Hub](supabase/migrations/20261104143056_reputation_feedback_hub.sql) lalu [migrasi RBAC dashboard](supabase/migrations/20261104151336_dashboard_rbac.sql).
+4. Untuk membuat ringkasan satu toko melalui API, kirim `POST /api/reports/weekly-sentiment` dengan JSON `{"store_id":"<uuid>"}` dan header `Authorization: Bearer <CRON_SECRET>`. Jadwal Vercel memakai `GET /api/cron/weekly-summary`.
 
 ### 5. Seed Akun Admin
-Jalankan perintah berikut untuk membuat akun administrator pertama:
+Atur `ADMIN_EMAIL`, `ADMIN_PASSWORD`, dan `ADMIN_FULL_NAME` di `.env.local`, lalu jalankan perintah berikut untuk membuat akun administrator pertama:
 ```bash
 npm run seed:admin
 ```
+
+Setelah berhasil dibuat, akun tersebut dikonfirmasi dan mendapat peran `superadmin` di `profiles.dashboard_role`. Gunakan `ADMIN_EMAIL` sebagai akun login di `/login`; password login adalah nilai `ADMIN_PASSWORD` yang Anda atur sendiri. Untuk memastikan akun benar-benar aktif di project yang sedang dipakai, cek **Supabase Dashboard → Authentication → Users** dan pastikan pengguna tidak dinonaktifkan. README ini tidak menyimpan password akun; jangan commit password asli atau file `.env.local`.
+
+Superadmin dapat memilih toko melalui bilah dashboard. Pemilik toko hanya dapat membuka toko yang menautkan profilnya melalui `merchants.owner_id`. Peran POS tetap disimpan di `profiles.role`.
+
+#### Akun demo untuk membandingkan dashboard
+
+| Peran | Email login | Status | Merchant |
+|---|---|---|---|
+| Superadmin | `nived.studio@gmail.com` | Aktif | Semua merchant |
+| Owner demo | `owner.central@example.com` | Aktif | Nived Demo Coffee (`trial`) |
+
+Login melalui `/login`. Password owner demo disimpan lokal di `.env.local` sebagai `DEMO_OWNER_PASSWORD`; email-nya tersedia sebagai `DEMO_OWNER_EMAIL`. Akun owner memiliki akses hanya ke merchant demo. Data ulasan, klik, dan tap pada merchant tersebut adalah data contoh buatan.
+
+Untuk menyiapkan contoh presentasi, jalankan [seed Kopi Titik Temu](supabase/seeds/reputation_dashboard_demo.sql), lalu buka `/dashboard/reviews-feedback` sebagai superadmin dan pilih **Kopi Titik Temu**. Lima klik, empat masukan, dan satu ringkasan tersedia saat seed pertama kali dijalankan.
 
 ---
 
@@ -272,8 +261,7 @@ npm start
 ```
 
 Akses aplikasi pada browser di:
-- **Halaman Penilaian Publik:** `http://localhost:3000/r/demo-card`
-- **Halaman Mode Direct:** `http://localhost:3000/r/direct-card`
+- **Halaman Pelanggan:** `http://localhost:3000/r/demo-card`
 - **Portal Admin:** `http://localhost:3000/admin`
 - **Dashboard Merchant:** `http://localhost:3000/dashboard`
 
@@ -284,7 +272,7 @@ Akses aplikasi pada browser di:
 Seluruh modul inti (validasi URL, perutean kartu, debounce IP, parsing perangkat, dan endpoint API) dilindungi oleh suite pengujian otomatis:
 
 ```bash
-# Menjalankan seluruh pengujian (171 tests)
+# Menjalankan seluruh pengujian
 npm test
 
 # Menjalankan linter (ESLint 9)
@@ -295,15 +283,14 @@ npm run lint
 
 ## 🔗 Format URL NFC & Google Business Profile Intent
 
-Untuk memastikan kartu NFC membuka **langsung modal ulasan bintang 5** (bukan hanya halaman profil bisnis umum), gunakan format URL berikut:
+Gunakan tautan ulasan Google Business Profile di pengaturan kartu:
 
-| Tipe Tautan | Contoh URL | Rekomendasi |
-|---|---|---|
-| **Google Review Intent (g.page)** | `https://g.page/r/CbXxZ0xxxxxx/review` | ⭐⭐⭐ Sangat Direkomendasikan (Langsung buka popup rating di Android & iOS) |
-| **Google Local Write Review** | `https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4` | ⭐⭐⭐ Sangat Direkomendasikan |
-| **Google Maps Shortlink** | `https://maps.app.goo.gl/AbCdEfGhIjKlMnOp` | ⭐ Didukung (Fallback) |
+| Tipe Tautan | Contoh URL |
+|---|---|
+| **Google Local Write Review** | `https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4` |
+| **Google Review Intent (g.page)** | `https://g.page/r/CbXxZ0xxxxxx/review` |
 
-Aplikasi memiliki parser & validator otomatis di [`src/lib/validation.js`](file:///Users/tabaniii/Herd/filter-rating/src/lib/validation.js) yang membersihkan spasi tidak sengaja dan memvalidasi keabsahan format URL sebelum disimpan.
+Kartu yang sudah memiliki tautan pendek Google Maps tetap dapat membukanya. Ganti tautan tersebut di Settings jika Anda ingin membuka formulir ulasan langsung.
 
 ---
 

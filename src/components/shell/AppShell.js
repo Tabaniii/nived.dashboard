@@ -11,10 +11,11 @@ import DashboardNav from '@/components/shell/DashboardNav';
  *   title: string,
  *   nav: Array<{ href: string, label: string }>,
  *   email?: string,
+ *   toolbar?: import('react').ReactNode,
  *   children: import('react').ReactNode
  * }} props
  */
-export default function AppShell({ title, nav, email, children }) {
+export default function AppShell({ title, nav, email, toolbar, children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -108,6 +109,7 @@ export default function AppShell({ title, nav, email, children }) {
             </div>
           </div>
         ) : null}
+        {toolbar}
       </header>
 
       {/* Main Content Area */}

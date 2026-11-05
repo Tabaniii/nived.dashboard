@@ -2,22 +2,18 @@
 
 import { useState, useTransition } from 'react';
 import QRCode from 'qrcode';
-import { Search, Copy, Check, QrCode, Shield, ExternalLink, Trash2, X, Download, AlertCircle, Loader2, Printer } from 'lucide-react';
-import { softDeleteCardAction, toggleShieldAction } from '../actions';
+import { Search, Copy, Check, QrCode, ExternalLink, Trash2, X, Download, AlertCircle, Loader2, Printer } from 'lucide-react';
+import { softDeleteCardAction } from '../actions';
 import { cardPublicUrl } from '@/lib/slug';
 
 export default function CardsTable({ cards = [] }) {
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState('');
-  const [modeFilter, setModeFilter] = useState('all');
   const [copiedId, setCopiedId] = useState(null);
   const [qrModal, setQrModal] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   const filtered = (cards || []).filter((card) => {
-    if (modeFilter === 'shield' && !card.is_shield_active) return false;
-    if (modeFilter === 'direct' && card.is_shield_active) return false;
-
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -51,7 +47,7 @@ export default function CardsTable({ cards = [] }) {
 
   return (
     <div className="space-y-4">
-      {/* Search & Mode Filters */}
+      {/* Search */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 max-w-sm">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400 dark:text-zinc-500">
@@ -66,42 +62,6 @@ export default function CardsTable({ cards = [] }) {
           />
         </div>
 
-        {/* Mode Filter Pills */}
-        <div className="flex items-center gap-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/90 dark:bg-zinc-900/60 p-1 text-xs">
-          <button
-            type="button"
-            onClick={() => setModeFilter('all')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition cursor-pointer ${
-              modeFilter === 'all'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-            }`}
-          >
-            Semua
-          </button>
-          <button
-            type="button"
-            onClick={() => setModeFilter('shield')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition cursor-pointer ${
-              modeFilter === 'shield'
-                ? 'bg-brand-500/15 text-brand-700 dark:text-brand-300 font-semibold shadow-xs'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-            }`}
-          >
-            Shield
-          </button>
-          <button
-            type="button"
-            onClick={() => setModeFilter('direct')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition cursor-pointer ${
-              modeFilter === 'direct'
-                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300 font-semibold shadow-xs'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-            }`}
-          >
-            Direct
-          </button>
-        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -127,23 +87,6 @@ export default function CardsTable({ cards = [] }) {
                       <p className="text-xs text-zinc-500">{card.merchants?.business_name || '—'}</p>
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() =>
-                        startTransition(() =>
-                          toggleShieldAction(card.id, !card.is_shield_active)
-                        )
-                      }
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold border transition cursor-pointer ${
-                        card.is_shield_active
-                          ? 'border-brand-500/30 bg-brand-500/15 text-brand-700 dark:text-brand-300'
-                          : 'border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-300'
-                      }`}
-                    >
-                      <Shield className="size-3" />
-                      <span>{card.is_shield_active ? 'Shield' : 'Direct'}</span>
-                    </button>
                   </div>
 
                   <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/70 p-2.5 font-mono text-xs flex items-center justify-between gap-2">
@@ -201,7 +144,6 @@ export default function CardsTable({ cards = [] }) {
                 <tr>
                   <th scope="col" className="px-4 py-3.5">Store & Merchant</th>
                   <th scope="col" className="px-4 py-3.5">Slug & URL NFC</th>
-                  <th scope="col" className="px-4 py-3.5 text-center">Reputation Mode</th>
                   <th scope="col" className="px-4 py-3.5 text-center">QR Code</th>
                   <th scope="col" className="px-4 py-3.5 text-right">Aksi</th>
                 </tr>
@@ -233,25 +175,6 @@ export default function CardsTable({ cards = [] }) {
                           </button>
                         </div>
                         <p className="text-[11px] text-zinc-400 dark:text-zinc-600 truncate max-w-xs mt-0.5">{url}</p>
-                      </td>
-                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                        <button
-                          type="button"
-                          disabled={pending}
-                          onClick={() =>
-                            startTransition(() =>
-                              toggleShieldAction(card.id, !card.is_shield_active)
-                            )
-                          }
-                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border transition cursor-pointer shadow-xs ${
-                            card.is_shield_active
-                              ? 'border-brand-500/30 bg-brand-500/15 text-brand-700 dark:text-brand-300 hover:bg-brand-500/25'
-                              : 'border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-300 hover:bg-amber-500/25'
-                          }`}
-                        >
-                          <Shield className="size-3.5" />
-                          <span>{card.is_shield_active ? 'Shield Mode' : 'Direct Mode'}</span>
-                        </button>
                       </td>
                       <td className="px-4 py-3.5 text-center whitespace-nowrap">
                         <button

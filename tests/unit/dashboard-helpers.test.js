@@ -162,7 +162,7 @@ describe('social card helpers', () => {
 
 describe('buildWeeklySummaryMessage', () => {
   const summary = {
-    summary: 'Minggu ini ada 4 catatan soal AC.',
+    summary: 'Empat pelanggan mengeluhkan AC. Kopi susu mendapat pujian. Periksa AC sebelum jam makan siang.',
     themes: [{ label: 'AC / suhu ruangan', count: 4, detail: 'meja 12' }],
     actions: ['Servis AC lantai dua', 'Tambah staf saat makan siang'],
     feedback_count: 12,
@@ -177,21 +177,21 @@ describe('buildWeeklySummaryMessage', () => {
       dashboardUrl: 'https://nived.studio/dashboard',
     });
 
-    expect(message).toContain('Kopi Senja');
-    expect(message).toContain('12 masukan');
-    expect(message).toContain('7 keluhan');
-    expect(message).toContain('Minggu ini ada 4 catatan soal AC.');
-    expect(message).toContain('• AC / suhu ruangan (4) — meja 12');
-    expect(message).toContain('1. Servis AC lantai dua');
-    expect(message).toContain('https://nived.studio/dashboard');
+    expect(message).toBe([
+      'Ringkasan Mingguan — Kopi Senja',
+      '12 masukan pribadi',
+      '',
+      summary.summary,
+      '',
+      'Detail: https://nived.studio/dashboard',
+    ].join('\n'));
   });
 
-  it('omits empty sections', () => {
+  it('omits the dashboard link when no URL is provided', () => {
     const message = buildWeeklySummaryMessage({
       businessName: 'Kopi Senja',
-      summary: { ...summary, themes: [], actions: [] },
+      summary,
     });
-    expect(message).not.toContain('Tema utama');
-    expect(message).not.toContain('Saran');
+    expect(message.endsWith(summary.summary)).toBe(true);
   });
 });

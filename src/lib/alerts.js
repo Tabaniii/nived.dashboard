@@ -58,6 +58,17 @@ export function resolveAlertTargets(card) {
   };
 }
 
+/** Weekly digests require an active card with dedicated notification destinations. */
+export function resolveWeeklySummaryTargets(card) {
+  if (card?.is_active !== true || card.alerts_enabled !== true) {
+    return { whatsapp: null, telegramChatId: null };
+  }
+  return {
+    whatsapp: sanitizeAlertPhone(card.alert_whatsapp),
+    telegramChatId: sanitizeTelegramChatId(card.alert_telegram_chat_id),
+  };
+}
+
 /**
  * Unique alert recipients across a merchant's cards, used for the weekly digest.
  * @param {Object[]} cards
@@ -67,7 +78,7 @@ export function collectDigestTargets(cards = []) {
   const whatsapp = new Set();
   const telegram = new Set();
   for (const card of cards) {
-    const targets = resolveAlertTargets(card);
+    const targets = resolveWeeklySummaryTargets(card);
     if (targets.whatsapp) whatsapp.add(targets.whatsapp);
     if (targets.telegramChatId) telegram.add(targets.telegramChatId);
   }

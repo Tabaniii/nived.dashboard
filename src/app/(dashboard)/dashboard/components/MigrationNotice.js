@@ -1,6 +1,6 @@
 import { Database } from 'lucide-react';
 
-export default function MigrationNotice({ feature = 'Fitur ini' }) {
+export default function MigrationNotice({ feature = 'Fitur ini', reputationHub = false }) {
   return (
     <div
       role="status"
@@ -11,7 +11,7 @@ export default function MigrationNotice({ feature = 'Fitur ini' }) {
         <p className="font-semibold">{feature} butuh update database</p>
         <p className="leading-relaxed">
           Buka Supabase → SQL Editor, tempel isi file{' '}
-          <code className="font-mono">supabase/migrations/20261015000000_growth_features.sql</code>, lalu klik
+          <code className="font-mono">supabase/migrations/{reputationHub ? '20261104143056_reputation_feedback_hub.sql' : '20261015000000_growth_features.sql'}</code>, lalu klik
           Run. Setelah itu muat ulang halaman ini.
         </p>
       </div>

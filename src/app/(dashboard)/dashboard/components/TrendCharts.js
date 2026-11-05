@@ -15,11 +15,15 @@ import {
 import useSWR from 'swr';
 import { TrendingUp, BarChart2, Clock, Activity } from 'lucide-react';
 
-const fetcher = (url) => fetch(url).then((r) => r.json());
+const fetcher = async (url) => {
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) throw new Error('Gagal memuat analitik toko.');
+  return response.json();
+};
 
 const chartMargin = { top: 8, right: 8, left: -20, bottom: 0 };
 
-const CustomTooltip = ({ active, payload, label, unit = 'taps' }) => {
+const CustomTooltip = ({ active, payload, label, unit = 'klik' }) => {
   if (active && payload && payload.length) {
     return (
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 p-3 text-xs shadow-xl backdrop-blur-md">
@@ -39,10 +43,10 @@ const TABS = [
   { id: 'peak', label: 'Jam Sibuk' },
 ];
 
-export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHours }) {
+export default function TrendCharts({ storeId, initialDaily, initialWeekly, initialPeakHours }) {
   const [activeTab, setActiveTab] = useState('daily');
 
-  const { data } = useSWR('/api/dashboard/analytics', fetcher, {
+  const { data } = useSWR(`/api/dashboard/analytics?store_id=${encodeURIComponent(storeId)}`, fetcher, {
     fallbackData: {
       daily: initialDaily,
       weekly: initialWeekly,
@@ -63,10 +67,10 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
         <div>
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
             <TrendingUp className="size-4 text-brand-600 dark:text-brand-400" />
-            <span>Tren Tap & Interaksi</span>
+            <span>Tren Google Review Taps</span>
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Aktivitas fisik pelanggan pada kartu NFC dan kode QR
+            Klik tautan Google Maps dari kartu NFC dan kode QR
           </p>
         </div>
 
@@ -94,14 +98,14 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
             <div className="mb-4">
               <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
                 <Activity className="size-3.5 text-brand-600 dark:text-brand-400" />
-                Daily Taps (28 Hari Terakhir)
+                Klik Google Review (28 Hari Terakhir)
               </h3>
-              <p className="text-[11px] text-zinc-500">Volume kunjungan harian pelanggan</p>
+              <p className="text-[11px] text-zinc-500">Volume klik harian pelanggan · WIB</p>
             </div>
             <div className="h-64 w-full">
               {daily.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs text-zinc-400 dark:text-zinc-500">
-                  Belum ada data tap dalam 28 hari terakhir.
+                  Belum ada klik Google Review dalam 28 hari terakhir.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -121,7 +125,7 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                     <YAxis stroke="#71717a" fontSize={10} allowDecimals={false} tickLine={false} axisLine={false} />
                     <Tooltip
                       cursor={{ stroke: '#2A53E7', strokeDasharray: '3 3', strokeOpacity: 0.4 }}
-                      content={<CustomTooltip unit="taps" />}
+                      content={<CustomTooltip unit="klik" />}
                     />
                     <Line
                       type="monotone"
@@ -165,7 +169,7 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                       axisLine={{ stroke: '#71717a', strokeOpacity: 0.2 }}
                     />
                     <YAxis stroke="#71717a" fontSize={10} allowDecimals={false} tickLine={false} axisLine={false} />
-                    <Tooltip cursor={false} content={<CustomTooltip unit="taps" />} />
+                    <Tooltip cursor={false} content={<CustomTooltip unit="klik" />} />
                     <Bar dataKey="count" fill="#2A53E7" radius={[6, 6, 0, 0]} maxBarSize={36} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -203,7 +207,7 @@ export default function TrendCharts({ initialDaily, initialWeekly, initialPeakHo
                       interval={1}
                     />
                     <YAxis stroke="#71717a" fontSize={10} allowDecimals={false} tickLine={false} axisLine={false} />
-                    <Tooltip cursor={false} content={<CustomTooltip unit="taps" />} />
+                    <Tooltip cursor={false} content={<CustomTooltip unit="klik" />} />
                     <Bar dataKey="count" fill="#608df3" radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>

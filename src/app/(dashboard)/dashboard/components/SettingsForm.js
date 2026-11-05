@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { ExternalLink, Copy, Check, ShieldCheck, MapPin, Phone, Store, Loader2, Info } from 'lucide-react';
+import Link from 'next/link';
+import { ExternalLink, Copy, Check, ShieldCheck, Phone, Store, Loader2, Info } from 'lucide-react';
 import { updateCardSettingsAction } from '../actions';
 import AlertSettingsForm from './AlertSettingsForm';
 import MigrationNotice from './MigrationNotice';
@@ -54,7 +55,7 @@ export default function SettingsForm({ cards = [], notifyStatus }) {
     setIsError(false);
 
     startTransition(async () => {
-      const result = await updateCardSettingsAction(formData);
+      const result = await updateCardSettingsAction(formData, selected.merchant_id);
       if (result?.error) {
         setIsError(true);
         setMessage(result.error);
@@ -100,15 +101,9 @@ export default function SettingsForm({ cards = [], notifyStatus }) {
       <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40 p-4 sm:p-5 shadow-xs space-y-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Tautan Publik Kartu NFC</span>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium border ${
-              selected.is_shield_active
-                ? 'border-brand-500/30 bg-brand-500/10 text-brand-700 dark:text-brand-300'
-                : 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300'
-            }`}
-          >
+          <span className="inline-flex items-center gap-1 rounded-full border border-brand-500/30 bg-brand-500/10 px-2.5 py-0.5 text-[11px] font-medium text-brand-700 dark:text-brand-300">
             <ShieldCheck className="size-3" />
-            <span>{selected.is_shield_active ? 'Shield Mode Aktif' : 'Direct Mode'}</span>
+            <span>Ulasan &amp; Masukan</span>
           </span>
         </div>
 
@@ -140,7 +135,7 @@ export default function SettingsForm({ cards = [], notifyStatus }) {
         <div className="flex items-start gap-2 text-[11px] text-zinc-500 pt-1">
           <Info className="size-3.5 shrink-0 mt-0.5" />
           <p>
-            Toggle Shield Mode dikendalikan sepenuhnya oleh Admin Nived sesuai status langganan.
+            Halaman ini selalu menampilkan tautan ulasan Google dan formulir masukan pribadi.
           </p>
         </div>
       </div>
@@ -169,22 +164,26 @@ export default function SettingsForm({ cards = [], notifyStatus }) {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="google_review_url" className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300">
-            <MapPin className="size-3.5 text-zinc-400 dark:text-zinc-500" />
-            <span>Google Review URL</span>
+          <label htmlFor="logo_url" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+            URL Logo Toko (opsional)
           </label>
           <input
-            id="google_review_url"
-            key={`${selected.id}-gurl`}
-            name="google_review_url"
+            id="logo_url"
+            key={`${selected.id}-logo`}
+            name="logo_url"
             type="url"
-            required
-            defaultValue={selected.google_review_url}
+            defaultValue={selected.logo_url || ''}
             className={fieldClass}
-            placeholder="https://g.page/r/XXXXX/review"
+            placeholder="https://contoh.com/logo.png"
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <Link href="/dashboard/review-link" className="text-xs font-medium text-brand-600 dark:text-brand-400 underline">
+            Kelola link ulasan Google Maps
+          </Link>
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-            Provide your Google Business Profile direct review intent URL so customers see the rating modal immediately upon opening.
+            Satu link ulasan berlaku untuk semua kartu NFC dan QR toko.
           </p>
         </div>
 
@@ -206,7 +205,7 @@ export default function SettingsForm({ cards = [], notifyStatus }) {
             placeholder="081234567890 → 6281234567890"
           />
           <p className="text-[11px] text-zinc-500">
-            Boleh ketik 08… — otomatis diubah ke 628…. Pelanggan 1–3★ bisa chat ke nomor ini.
+            Boleh ketik 08… — otomatis diubah ke 628….
           </p>
         </div>
 
@@ -241,7 +240,7 @@ export default function SettingsForm({ cards = [], notifyStatus }) {
         </div>
       </form>
 
-      {!Object.hasOwn(selected, 'alerts_enabled') && <MigrationNotice feature="Alert rating jelek" />}
+      {!Object.hasOwn(selected, 'alerts_enabled') && <MigrationNotice feature="Pengiriman ringkasan mingguan" />}
       <AlertSettingsForm
         key={`${selected.id}-alerts`}
         card={selected}

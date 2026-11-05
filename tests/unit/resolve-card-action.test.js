@@ -2,36 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { resolveCardAction } from '@/lib/resolve-card-action';
 
 describe('resolveCardAction', () => {
-  it('returns fallback when card is missing or soft deleted', () => {
-    expect(resolveCardAction(null)).toEqual({ type: 'fallback' });
-    expect(resolveCardAction({ slug: 'old-card', deleted_at: new Date().toISOString() })).toEqual({
-      type: 'fallback',
-    });
+  it.each([
+    null,
+    { slug: 'old-card', deleted_at: '2026-10-01T00:00:00.000Z' },
+    { slug: 'inactive-card', is_active: false },
+  ])('returns the fallback for an unavailable card', (card) => {
+    expect(resolveCardAction(card)).toEqual({ type: 'fallback' });
   });
 
-  it('returns HTTP 307 direct redirect when shield is inactive (TM-06)', () => {
+  it.each([true, false])('shows the same choices with legacy shield value %s', (legacyShield) => {
     const card = {
-      id: 'a23deb4d-4b7d-4bad-9bdd-2b0d7b3dcb6e',
-      slug: 'direct-card',
-      is_shield_active: false,
-      google_review_url: 'https://maps.app.goo.gl/direct-review',
+      slug: 'example-card',
+      is_shield_active: legacyShield,
+      google_review_url: 'https://search.google.com/local/writereview?placeid=example',
     };
 
-    expect(resolveCardAction(card)).toEqual({
-      type: 'direct_redirect',
-      url: 'https://maps.app.goo.gl/direct-review',
-      status: 307,
-    });
-  });
-
-  it('returns shield_ui when shield is active', () => {
-    const card = {
-      id: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
-      slug: 'demo-card',
-      is_shield_active: true,
-      google_review_url: 'https://maps.app.goo.gl/demo-review',
-    };
-
-    expect(resolveCardAction(card)).toEqual({ type: 'shield_ui', card });
+    expect(resolveCardAction(card)).toEqual({ type: 'choice', mode: 'review' });
   });
 });

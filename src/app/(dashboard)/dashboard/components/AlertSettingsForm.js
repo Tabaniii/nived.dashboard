@@ -55,14 +55,13 @@ export default function AlertSettingsForm({ card, notifyStatus, needsMigration =
   const [testResult, setTestResult] = useState(null);
 
   const botUsername = notifyStatus?.telegramBotUsername;
-  const fallbackNumber = normalizePhoneNumber(card.whatsapp_number || '');
 
   function onSubmit(event) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     setMessage(null);
     startSaving(async () => {
-      const result = await updateAlertSettingsAction(formData);
+      const result = await updateAlertSettingsAction(formData, card.merchant_id);
       setMessage(result?.error ? { error: true, text: result.error } : { error: false, text: 'Pengaturan alert disimpan.' });
     });
   }
@@ -70,7 +69,7 @@ export default function AlertSettingsForm({ card, notifyStatus, needsMigration =
   function onTest() {
     setTestResult(null);
     startTesting(async () => {
-      setTestResult(await sendTestAlertAction(card.id));
+      setTestResult(await sendTestAlertAction(card.id, card.merchant_id));
     });
   }
 
@@ -85,10 +84,10 @@ export default function AlertSettingsForm({ card, notifyStatus, needsMigration =
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
             <BellRing className="size-4 text-brand-600 dark:text-brand-400" />
-            Alert Instan Rating 1–3★
+            Pengiriman Ringkasan Mingguan
           </h3>
           <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-            Kabari manager saat pelanggan memberi rating jelek, supaya bisa dihampiri sebelum pulang.
+            Kirim ringkasan setiap Senin ke tujuan yang Anda atur di bawah.
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -104,13 +103,13 @@ export default function AlertSettingsForm({ card, notifyStatus, needsMigration =
           defaultChecked={card.alerts_enabled !== false}
           className="size-4 rounded border-zinc-300 text-brand-500 focus:ring-brand-500/30"
         />
-        Kirim alert untuk kartu ini
+        Aktifkan pengiriman mingguan
       </label>
 
       <div className="space-y-1.5">
         <label htmlFor="alert_whatsapp" className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300">
           <Phone className="size-3.5 text-zinc-400 dark:text-zinc-500" />
-          WhatsApp penerima alert
+          WhatsApp penerima ringkasan
         </label>
         <input
           id="alert_whatsapp"
@@ -120,10 +119,10 @@ export default function AlertSettingsForm({ card, notifyStatus, needsMigration =
           onChange={handleWhatsAppInput}
           onBlur={handleWhatsAppInput}
           className={fieldClass}
-          placeholder={fallbackNumber ? `Kosongkan = pakai ${fallbackNumber}` : '081234567890 → 6281234567890'}
+          placeholder="081234567890 → 6281234567890"
         />
         <p className="text-[11px] text-zinc-500">
-          Kosongkan untuk memakai nomor WhatsApp toko di atas. Dikirim lewat Fonnte.
+          Isi nomor ini untuk mengirim ringkasan lewat Fonnte.
         </p>
       </div>
 
@@ -160,7 +159,7 @@ export default function AlertSettingsForm({ card, notifyStatus, needsMigration =
           className="flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer shadow-xs"
         >
           {saving && <Loader2 className="size-4 animate-spin" />}
-          <span>{saving ? 'Menyimpan...' : 'Simpan Alert'}</span>
+          <span>{saving ? 'Menyimpan...' : 'Simpan Pengiriman'}</span>
         </button>
         <button
           type="button"

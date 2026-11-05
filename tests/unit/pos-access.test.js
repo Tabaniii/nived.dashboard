@@ -5,6 +5,7 @@ vi.mock('next/cache',()=>({revalidatePath:vi.fn()}));
 import { requireRole } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { adminContext, reportData, orderDetail, allRows } from '@/lib/pos/data';
+import { getAdminOverview, listCards, listMerchants, listTelemetry } from '@/app/(admin)/admin/queries';
 import { saveEmployee,saveOutlet } from '@/app/(admin)/admin/pos/actions';
 beforeEach(()=>vi.resetAllMocks());
 describe('POS server authorization',()=>{
@@ -28,6 +29,18 @@ describe('POS server authorization',()=>{
     expect((await allRows(()=>({order:()=>({range})}))).length).toBe(501);
     expect(range).toHaveBeenLastCalledWith(500,999);
   });
+});
+
+describe('legacy admin data authorization', () => {
+  it.each([getAdminOverview, listCards, listMerchants, listTelemetry])(
+    'blocks direct access to privileged reads through %s',
+    async (read) => {
+      requireRole.mockResolvedValue(null);
+
+      await expect(read()).rejects.toThrow('NEXT_REDIRECT');
+      expect(createAdminClient).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('employee provisioning',()=>{

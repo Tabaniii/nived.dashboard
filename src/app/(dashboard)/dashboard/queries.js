@@ -1,31 +1,63 @@
 import { cache } from 'react';
+import { cookies } from 'next/headers';
 import { connection } from 'next/server';
+import { getSessionProfile } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
+import { isValidUUID } from '@/lib/validation';
 import { isMissingSchemaError } from '@/lib/db-errors';
 import { buildLeaderboard } from '@/lib/staff-stats';
 import { resolveDateRange } from '@/lib/date-range';
 
-/** Deduped per request — layout + page share one auth/profile round-trip. */
+export const DASHBOARD_STORE_COOKIE = 'nived_dashboard_store';
+const STORE_COLUMNS = 'id, business_name, owner_name, status';
+
+/** Layout and page share the session and selected store within this request. */
 export const getClientContext = cache(async () => {
-  await connection();
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const session = await getSessionProfile();
+  if (!session) return null;
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, email, role, full_name, merchant_id, merchants(id, business_name, status)')
-    .eq('id', user.id)
-    .maybeSingle();
+  const { profile, user } = session;
+  if (profile.dashboard_role === 'superadmin') {
+    const storeId = (await cookies()).get(DASHBOARD_STORE_COOKIE)?.value;
+    if (!isValidUUID(storeId)) return { ...session, merchant: null };
 
-  if (!profile || profile.role !== 'client' || !profile.merchant_id) {
-    return null;
+    const supabase = await createClient();
+    const { data, error } = await supabase.from('merchants')
+      .select(STORE_COLUMNS)
+      .eq('id', storeId.trim())
+      .maybeSingle();
+    if (error) throw error;
+    return { ...session, merchant: data };
   }
+  if (profile.dashboard_role !== 'owner') return null;
 
-  return { user, profile, merchant: profile.merchants };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('merchants')
+    .select(STORE_COLUMNS)
+    .eq('owner_id', user.id)
+    .in('status', ['active', 'trial'])
+    .maybeSingle();
+  if (error) throw error;
+  return data ? { ...session, merchant: data } : null;
 });
+
+export async function getDashboardStoreOptions() {
+  const ctx = await getClientContext();
+  if (ctx?.profile.dashboard_role !== 'superadmin') return [];
+
+  const supabase = await createClient();
+  const stores = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await supabase.from('merchants')
+      .select('id, business_name, status')
+      .order('business_name')
+      .order('id')
+      .range(offset, offset + 499);
+    if (error) throw error;
+    stores.push(...data);
+    if (data.length < 500) return stores;
+  }
+}
 
 export const getClientCards = cache(async (merchantId) => {
   const supabase = await createClient();
@@ -40,134 +72,91 @@ export const getClientCards = cache(async (merchantId) => {
   return data || [];
 });
 
-/**
- * @param {string} merchantId
- * @param {boolean} [includeFeedbacks=true] — pass `false` for analytics-only (lighter)
- */
+/** Store overview uses the same POS payments and tabletop feedback as the hub. */
 export async function getClientDashboardData(merchantId, includeFeedbacks = true) {
   await connection();
   const supabase = await createClient();
-  const cards = await getClientCards(merchantId);
-  const cardIds = cards.map((c) => c.id);
+  const now = new Date();
+  const dayMs = 86_400_000;
+  const wibOffsetMs = 7 * 60 * 60 * 1000;
+  const wibNow = new Date(now.getTime() + wibOffsetMs);
+  const startOfToday = new Date(Date.UTC(
+    wibNow.getUTCFullYear(), wibNow.getUTCMonth(), wibNow.getUTCDate()
+  ) - wibOffsetMs);
+  const startOfRange = new Date(startOfToday.getTime() - 27 * dayMs);
+  const dayKey = (date) => new Date(date.getTime() + wibOffsetMs).toISOString().slice(0, 10);
 
-  if (cardIds.length === 0) {
-    return {
-      cards,
-      kpi: { tapsToday: 0, tapsMonth: 0, positiveReviews: 0, shieldedComplaints: 0 },
-      daily: [],
-      weekly: [],
-      peakHours: Array.from({ length: 24 }, (_, hour) => ({ hour: `${String(hour).padStart(2, '0')}:00`, count: 0 })),
-      feedbacks: [],
-    };
-  }
-
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfMonth = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1);
-  const startOfRange = new Date(startOfToday);
-  startOfRange.setDate(startOfRange.getDate() - 27);
-  const tapQueryStart = startOfMonth < startOfRange ? startOfMonth : startOfRange;
-
-  const tapsPromise = supabase
-    .from('tap_logs')
-    .select('id, selected_stars, created_at, card_id')
-    .in('card_id', cardIds)
-    .gte('created_at', tapQueryStart.toISOString());
-
-  const complaintsPromise = supabase
-    .from('internal_feedbacks')
-    .select('id', { count: 'exact', head: true })
-    .in('card_id', cardIds)
-    .lte('rating', 3);
-
-  const feedbacksPromise = includeFeedbacks
-    ? supabase
-        .from('internal_feedbacks')
-        .select('*, cards(store_name)')
-        .in('card_id', cardIds)
-        .order('created_at', { ascending: false })
-        .limit(100)
-    : Promise.resolve({ data: [], error: null });
-
-  const [tapsResult, feedbacksResult, complaintsResult] = await Promise.all([
-    tapsPromise,
-    feedbacksPromise,
-    complaintsPromise,
+  const [cards, clicksResult, paymentsResult, ordersResult, feedbackResult] = await Promise.all([
+    getClientCards(merchantId),
+    fetchAllRows((from, to) => supabase.from('review_click_events')
+      .select('id, created_at')
+      .eq('store_id', merchantId)
+      .gte('created_at', startOfRange.toISOString())
+      .lte('created_at', now.toISOString())
+      .order('id', { ascending: true })
+      .range(from, to)),
+    fetchAllRows((from, to) => supabase.from('payments')
+      .select('id, amount')
+      .eq('merchant_id', merchantId)
+      .eq('status', 'success')
+      .gte('paid_at', startOfToday.toISOString())
+      .lte('paid_at', now.toISOString())
+      .order('id', { ascending: true })
+      .range(from, to)),
+    supabase.from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('merchant_id', merchantId)
+      .in('status', ['open', 'sent', 'ready'])
+      .not('table_id', 'is', null),
+    supabase.from('customer_feedback')
+      .select('id, table_number, category, feedback_text, customer_contact, created_at, resolved_status', {
+        count: 'exact', head: !includeFeedbacks,
+      })
+      .eq('store_id', merchantId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(25),
   ]);
-
-  if (tapsResult.error) throw tapsResult.error;
-  if (feedbacksResult.error) throw feedbacksResult.error;
-  if (complaintsResult.error) throw complaintsResult.error;
-
-  const allTaps = tapsResult.data || [];
-  const feedbacks = feedbacksResult.data || [];
-  const tapsToday = allTaps.filter((t) => new Date(t.created_at) >= startOfToday).length;
-  const tapsMonth = allTaps.filter((t) => new Date(t.created_at) >= startOfMonth).length;
-  const positiveReviews = allTaps.filter((t) => {
-    const createdAt = new Date(t.created_at);
-    return (
-      createdAt >= startOfRange &&
-      (t.selected_stars === 4 || t.selected_stars === 5)
-    );
-  }).length;
+  for (const result of [clicksResult, paymentsResult, ordersResult, feedbackResult]) {
+    if (result.error) throw result.error;
+  }
 
   const dailyMap = new Map();
-  const weeklyMap = new Map();
-  const hourMap = new Map(Array.from({ length: 24 }, (_, h) => [h, 0]));
-
-  for (const tap of allTaps) {
-    const d = new Date(tap.created_at);
-    if (d >= startOfRange) {
-      const dayKey = d.toISOString().slice(0, 10);
-      dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + 1);
-      hourMap.set(d.getHours(), (hourMap.get(d.getHours()) || 0) + 1);
-    }
-
-    const tapDay = new Date(d);
-    tapDay.setHours(0, 0, 0, 0);
-    const weekIndex = Math.floor((startOfToday - tapDay) / (7 * 86400000));
-    if (weekIndex >= 0 && weekIndex < 4) {
-      weeklyMap.set(weekIndex, (weeklyMap.get(weekIndex) || 0) + 1);
-    }
+  const weeklyCounts = [0, 0, 0, 0];
+  const hourlyCounts = Array(24).fill(0);
+  for (const click of clicksResult.data) {
+    const date = new Date(click.created_at);
+    const key = dayKey(date);
+    dailyMap.set(key, (dailyMap.get(key) || 0) + 1);
+    hourlyCounts[(date.getUTCHours() + 7) % 24] += 1;
+    const dayStart = Date.parse(`${key}T00:00:00+07:00`);
+    const weekIndex = Math.floor((startOfToday.getTime() - dayStart) / (7 * dayMs));
+    weeklyCounts[weekIndex] += 1;
   }
 
-  const daily = [];
-  for (let i = 27; i >= 0; i -= 1) {
-    const d = new Date(startOfToday);
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    daily.push({ date: key, count: dailyMap.get(key) || 0 });
-  }
-
-  const weekly = [];
-  for (let w = 3; w >= 0; w -= 1) {
-    const end = new Date(startOfToday);
-    end.setDate(end.getDate() - w * 7);
-    const start = new Date(end);
-    start.setDate(start.getDate() - 6);
-    weekly.push({
-      week: `${start.toISOString().slice(5, 10)}–${end.toISOString().slice(5, 10)}`,
-      count: weeklyMap.get(w) || 0,
-    });
-  }
-
-  const peakHours = Array.from(hourMap.entries()).map(([hour, count]) => ({
-    hour: `${String(hour).padStart(2, '0')}:00`,
-    count,
-  }));
+  const daily = Array.from({ length: 28 }, (_, index) => {
+    const date = dayKey(new Date(startOfRange.getTime() + index * dayMs));
+    return { date, count: dailyMap.get(date) || 0 };
+  });
+  const weekly = Array.from({ length: 4 }, (_, index) => {
+    const week = 3 - index;
+    const end = new Date(startOfToday.getTime() - week * 7 * dayMs);
+    const start = new Date(end.getTime() - 6 * dayMs);
+    return { week: `${dayKey(start).slice(5)}–${dayKey(end).slice(5)}`, count: weeklyCounts[week] };
+  });
 
   return {
     cards,
     kpi: {
-      tapsToday,
-      tapsMonth,
-      positiveReviews,
-      shieldedComplaints: complaintsResult.count || 0,
+      salesToday: paymentsResult.data.reduce((sum, payment) => sum + Number(payment.amount), 0),
+      activeTableOrders: ordersResult.count ?? 0,
+      reviewClicks: clicksResult.data.filter((click) => new Date(click.created_at).getTime() >= now.getTime() - 7 * dayMs).length,
+      privateFeedbacks: feedbackResult.count ?? 0,
     },
     daily,
     weekly,
-    peakHours,
-    feedbacks,
+    peakHours: hourlyCounts.map((count, hour) => ({ hour: `${String(hour).padStart(2, '0')}:00`, count })),
+    feedbacks: feedbackResult.data || [],
   };
 }
 
@@ -185,9 +174,9 @@ async function fetchAllRows(fetchPage) {
     const { data, error } = await fetchPage(from, from + PAGE_SIZE - 1);
     if (error) return { data: null, error };
     rows.push(...(data || []));
-    if (!data || data.length < PAGE_SIZE) break;
+    if (!data || data.length < PAGE_SIZE) return { data: rows, error: null };
   }
-  return { data: rows, error: null };
+  return { data: null, error: new Error('Terlalu banyak data. Persempit periode laporan.') };
 }
 
 /**
@@ -286,4 +275,25 @@ export async function getSocialProofCandidates(merchantId) {
     cards,
     reviews: (data || []).filter((review) => review.feedback_text?.trim()),
   };
+}
+
+/** Rolling seven-day Google link clicks and the latest private feedback for this store. */
+export async function getReviewsFeedbackData(storeId) {
+  const supabase = await createClient();
+  const now = Date.now();
+  const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  return Promise.all([
+    supabase.from('review_click_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('store_id', storeId)
+      .gte('created_at', sevenDaysAgo)
+      .lte('created_at', new Date(now).toISOString()),
+    supabase.from('customer_feedback')
+      .select('id, table_number, category, feedback_text, customer_contact, created_at, resolved_status', { count: 'exact' })
+      .eq('store_id', storeId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(25),
+  ]);
 }

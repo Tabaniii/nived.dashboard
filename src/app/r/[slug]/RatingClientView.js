@@ -1,653 +1,174 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import Image from 'next/image';
-import { submitReviewAction } from '@/app/actions/review';
-import { formatWhatsAppUrl } from '@/lib/whatsapp';
+import { ArrowUpRight, Check, ChevronRight, MapPin, MessageSquare, X } from 'lucide-react';
+import { FEEDBACK_CATEGORIES } from '@/lib/customer-feedback';
 import { getStoreInitials } from '@/lib/store-initials';
 
-export { getStoreInitials };
+const cardClass = 'flex w-full items-start gap-3 rounded-2xl p-4 text-left motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-700';
+const fieldClass = 'mt-1 block w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 focus-visible:outline-2 focus-visible:outline-brand-700';
+const successMessage = 'Terima kasih! Masukan Anda langsung diterima tim manajemen.';
+const submitError = 'Masukan belum terkirim. Silakan coba lagi.';
 
-export const ratingLabels = [
-  'Needs Improvement',
-  'Fair',
-  'Good',
-  'Great Experience!',
-  'Exceptional!',
-];
+export default function RatingClientView({ card, tableNumber, promo }) {
+  const dialog = useRef(null);
+  const textarea = useRef(null);
+  const [logoFailed, setLogoFailed] = useState(false);
+  const [status, setStatus] = useState('idle');
+  const [error, setError] = useState('');
 
-function recordStarTelemetry(cardId, star, attribution) {
-  if (!cardId) return;
-
-  const payload = JSON.stringify({
-    card_id: cardId,
-    selected_stars: star,
-    staff_code: attribution?.staffCode || undefined,
-    table_code: attribution?.tableCode || undefined,
-  });
-  if (typeof navigator.sendBeacon === 'function') {
-    try {
-      if (
-        navigator.sendBeacon(
-          '/api/telemetry/star',
-          new Blob([payload], { type: 'application/json' })
-        )
-      ) {
-        return;
-      }
-    } catch {
-      // Beacon delivery optional; keep interaction smooth
-    }
+  function trackClick() {
+    void fetch('/api/feedback/google-click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ card_id: card.id, table_number: tableNumber }),
+      keepalive: true,
+    }).catch(() => {});
   }
 
-  fetch('/api/telemetry/star', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: payload,
-    keepalive: true,
-  }).catch(() => {});
-}
+  function openFeedback() {
+    dialog.current.showModal();
+    textarea.current.focus();
+  }
 
-function StarIcon({ className, filled }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill={filled ? 'currentColor' : 'none'}
-      stroke={filled ? 'none' : 'currentColor'}
-      strokeWidth={filled ? 0 : 1.75}
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="m12 2.5 2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55L2.48 9.42l6.58-.96L12 2.5Z"
-      />
-    </svg>
-  );
-}
+  function startFeedback() {
+    if (status === 'pending') return;
+    setError('');
+    setStatus('idle');
+    openFeedback();
+  }
 
-export default function RatingClientView({ card, attribution }) {
-  const [selectedRating, setSelectedRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [feedbackText, setFeedbackText] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [savedReview, setSavedReview] = useState(null);
-  const [submitError, setSubmitError] = useState('');
-  const [clipboardStatus, setClipboardStatus] = useState('idle'); // 'idle' | 'copied' | 'copying' | 'manual'
-  const [logoFailed, setLogoFailed] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
-
-  const submittingRef = useRef(false);
-  const confirmationRef = useRef(null);
-  const reviewTextRef = useRef(null);
-  const redirectTimeoutRef = useRef(null);
-
-  const storeName = card?.store_name || 'Our Business';
-
-  useEffect(() => {
-    return () => {
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (savedReview) {
-      confirmationRef.current?.focus();
-    }
-  }, [savedReview]);
-
-  const copyReview = async (text) => {
-    if (!text) return;
-    setClipboardStatus('copying');
-    try {
-      if (!navigator.clipboard?.writeText) {
-        throw new Error('Clipboard API unavailable');
-      }
-      await navigator.clipboard.writeText(text);
-      setClipboardStatus('copied');
-    } catch {
-      // Graceful fallback to manual selection
-      setClipboardStatus('manual');
-    }
-  };
-
-  const handleRatingChange = (star) => {
-    if (submittingRef.current || savedReview) return;
-    setSelectedRating(star);
-    setSubmitError('');
-    recordStarTelemetry(card?.id, star, attribution);
-  };
-
-  const handleFeedbackSubmit = async (event) => {
+  async function submitFeedback(event) {
     event.preventDefault();
-    if (submittingRef.current || savedReview) return;
+    if (status === 'pending') return;
+    const form = event.currentTarget;
+    const fields = Object.fromEntries(new FormData(form));
+    setStatus('pending');
+    setError('');
+    dialog.current.close();
 
-    // Client-side validation: Star rating is required
-    if (!selectedRating || selectedRating < 1 || selectedRating > 5) {
-      setSubmitError('Please select a star rating (1 to 5) before submitting.');
-      return;
-    }
-
-    const trimmedText = feedbackText.trim();
-    // Copy inside the tap itself: Safari rejects clipboard writes after an await.
-    if (selectedRating >= 4 && card?.google_review_url && trimmedText) {
-      void copyReview(trimmedText);
-    }
-
-    submittingRef.current = true;
-    setIsSubmitting(true);
-    setHoverRating(0);
-    setSubmitError('');
-
-    const payload = {
-      card_id: card?.id,
-      rating: selectedRating,
-      feedback_text: trimmedText,
-      staff_code: attribution?.staffCode || '',
-      table_code: attribution?.tableCode || '',
-    };
-
+    let message = submitError;
     try {
-      let result = null;
-
-      // Primary: invoke Next.js Server Action
-      try {
-        result = await submitReviewAction(payload);
-      } catch {
-        // Fallback: POST to API Route Handler
-        const response = await fetch('/api/feedback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        result = await response.json();
-      }
-
-      if (!result || result.success !== true) {
-        throw new Error(
-          result?.error || result?.message || 'Unable to submit your review. Please try again.'
-        );
-      }
-
-      let googleReviewUrl = null;
-      if (selectedRating >= 4 && result.next_action === 'google_review' && result.google_review_url) {
-        try {
-          const url = new URL(result.google_review_url);
-          if (['https:', 'http:'].includes(url.protocol) && !url.username && !url.password) {
-            googleReviewUrl = url.href;
-          }
-        } catch {
-          // Keep saved confirmation usable if URL parsing fails
-        }
-      }
-
-      const savedText = typeof result.feedback_text === 'string' ? result.feedback_text : trimmedText;
-
-      setSavedReview({
-        rating: selectedRating,
-        text: savedText,
-        googleReviewUrl,
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...fields,
+          card_id: card.id,
+          table_number: tableNumber ?? fields.table_number,
+        }),
       });
-
-      if (googleReviewUrl) {
-        setIsRedirecting(true);
-        redirectTimeoutRef.current = setTimeout(() => {
-          window.location.href = googleReviewUrl;
-        }, savedText ? 1500 : 700);
+      if (response.ok) {
+        form.reset();
+        setStatus('sent');
+        return;
       }
-    } catch (err) {
-      setSubmitError(err.message || 'Connection error. Please try submitting again.');
-    } finally {
-      submittingRef.current = false;
-      setIsSubmitting(false);
+      const result = await response.json();
+      message = result.error || submitError;
+    } catch {
+      // Reopen the draft if the request failed before a response arrived.
     }
-  };
-
-  const displayedRating = hoverRating || selectedRating;
-  const isHighRating = selectedRating >= 4;
-
-  const waUrl =
-    card?.whatsapp_number && selectedRating > 0 && selectedRating <= 3
-      ? formatWhatsAppUrl({
-          phoneNumber: card.whatsapp_number,
-          storeName,
-          rating: selectedRating,
-          feedbackText,
-        })
-      : null;
+    setStatus('idle');
+    setError(message);
+    openFeedback();
+  }
 
   return (
-    <main className="flex min-h-svh w-full flex-1 flex-col items-center justify-center bg-radial from-stone-50 via-[#f4f6f2] to-[#e8ece5] px-4 py-8 text-stone-900 sm:py-12">
-      {/* Live top pill */}
-      <div className="mb-5 flex items-center gap-2 rounded-full border border-brand-900/10 bg-brand-50/80 px-3.5 py-1 text-[11px] font-semibold tracking-wider text-brand-900">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-600" />
-        </span>
-        Every Experience Matters
-      </div>
-
-      <article className="relative w-full max-w-md overflow-hidden rounded-[2.25rem] border border-stone-200/90 bg-white/95 shadow-[0_20px_70px_-25px_rgba(20,50,30,0.18)] backdrop-blur-md transition-all">
-        {/* Subtle decorative glow */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-16 left-1/2 h-32 w-64 -translate-x-1/2 rounded-full bg-linear-to-b from-brand-100/60 to-transparent blur-2xl"
-        />
-
-        {/* Header with Business Info */}
-        <header className="relative border-b border-stone-100 bg-linear-to-b from-brand-50/50 to-white px-6 pb-6 pt-8 text-center sm:px-8">
-          {card?.logo_url && !logoFailed ? (
-            <Image
-              src={card.logo_url}
-              alt={`Logo ${storeName}`}
-              width={76}
-              height={76}
-              unoptimized
-              onError={() => setLogoFailed(true)}
-              className="mx-auto mb-3.5 h-[76px] w-[76px] rounded-2xl border-2 border-white bg-white object-cover shadow-sm ring-1 ring-stone-200/70"
-            />
+    <main className="flex min-h-svh w-full items-center justify-center bg-stone-100 px-4 py-8 text-stone-900 scheme-light">
+      <article className="w-full max-w-2xl rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
+        <header className="mb-6 flex flex-wrap items-center gap-3">
+          {card.logo_url && !logoFailed ? (
+            <Image src={card.logo_url} alt="" width={48} height={48} unoptimized onError={() => setLogoFailed(true)} className="size-12 rounded-xl object-cover" />
           ) : (
-            <div
-              aria-hidden="true"
-              className="mx-auto mb-3.5 flex h-[76px] w-[76px] items-center justify-center rounded-2xl border border-brand-800/10 bg-linear-to-br from-brand-900 to-brand-950 text-2xl font-bold tracking-tight text-white shadow-md ring-2 ring-brand-900/10"
-            >
-              {getStoreInitials(storeName)}
-            </div>
+            <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-xl bg-brand-900 font-semibold text-white">
+              {getStoreInitials(card.store_name)}
+            </span>
           )}
-          <h1 className="text-xl font-bold tracking-tight text-stone-900 sm:text-2xl">
-            {storeName}
-          </h1>
-          <p className="mt-1 text-xs text-stone-500">Thank you for visiting us!</p>
+          <h1 className="min-w-0 flex-1 wrap-break-word text-lg font-bold tracking-tight sm:text-xl">{card.store_name}</h1>
+          {tableNumber && <p className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-900">Meja {tableNumber}</p>}
         </header>
 
-        {/* Confirmation Screens vs Rating Form */}
-        {savedReview ? (
-          <section
-            className="px-6 py-8 text-center sm:px-8 transition-all"
-            aria-labelledby="confirmation-title"
-          >
-            {savedReview.googleReviewUrl ? (
-              /* Case 4-5 Stars: Google Review Booster Transition Screen */
-              <div className="space-y-6">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-50 text-amber-500 shadow-sm ring-4 ring-amber-100/70">
-                  <StarIcon className="h-9 w-9" filled={true} />
-                </div>
-
-                <div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-[11px] font-semibold text-brand-800 ring-1 ring-brand-600/20">
-                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Rating Saved · {savedReview.rating} of 5 Stars
-                  </span>
-                  <h2
-                    ref={confirmationRef}
-                    id="confirmation-title"
-                    tabIndex={-1}
-                    className="mt-3 text-2xl font-bold tracking-tight text-stone-900 outline-none"
-                  >
-                    Thank you for the wonderful rating!
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-stone-600">
-                    {!savedReview.text
-                      ? 'Would you take 10 seconds to share your experience on Google?'
-                      : clipboardStatus === 'manual'
-                        ? 'Copy your review below, then paste it on Google and tap Post.'
-                        : 'Your review is copied — just paste it on Google and tap Post.'}
-                  </p>
-                  {isRedirecting && (
-                    <p
-                      aria-live="polite"
-                      className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-brand-700"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
-                      />
-                      Opening Google Reviews…
-                    </p>
-                  )}
-                </div>
-
-                {savedReview.text && (
-                  <div className="rounded-2xl border border-stone-200/90 bg-stone-50/90 p-4 text-left shadow-xs">
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="saved-review-text" className="text-xs font-bold text-stone-700">
-                        Your Written Review
-                      </label>
-                      {clipboardStatus === 'copied' && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-700">
-                          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                          Copied to clipboard!
-                        </span>
-                      )}
-                    </div>
-
-                    <textarea
-                      ref={reviewTextRef}
-                      id="saved-review-text"
-                      value={savedReview.text}
-                      readOnly
-                      rows={3}
-                      onFocus={(e) => e.target.select()}
-                      className="mt-2 w-full resize-none rounded-xl border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-700 outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
-                    />
-
-                    <div className="mt-3 flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={() => copyReview(savedReview.text)}
-                        disabled={clipboardStatus === 'copying'}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-800 underline decoration-brand-800/40 underline-offset-4 hover:text-brand-950 focus-visible:outline-2 focus-visible:outline-brand-600"
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        {clipboardStatus === 'copied' ? 'Copy review again' : 'Copy review text'}
-                      </button>
-
-                      {clipboardStatus === 'manual' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            reviewTextRef.current?.focus();
-                            reviewTextRef.current?.select();
-                          }}
-                          className="text-xs font-medium text-stone-500 underline"
-                        >
-                          Select text
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-2">
-                  <a
-                    href={savedReview.googleReviewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-brand-900 to-brand-800 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-900/20 transition-all hover:from-brand-800 hover:to-brand-700 hover:shadow-brand-900/30 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 active:scale-[0.99]"
-                  >
-                    <span>Post to Google Reviews</span>
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                      aria-hidden="true"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M7 7h10v10" />
-                    </svg>
-                  </a>
-                  <p className="mt-2.5 text-xs text-stone-400">
-                    Opens in a new tab. Paste your copied review and tap post!
-                  </p>
-                </div>
-              </div>
-            ) : (
-              /* Case 1-3 Stars: Private Feedback Polite Confirmation Screen */
-              <div className="space-y-6">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-brand-50 text-brand-700 shadow-sm ring-4 ring-brand-100/70">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    className="h-8 w-8"
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
-                  </svg>
-                </div>
-
-                <div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-[11px] font-semibold text-brand-800 ring-1 ring-brand-600/20">
-                    Private Feedback Recorded
-                  </span>
-                  <h2
-                    ref={confirmationRef}
-                    id="confirmation-title"
-                    tabIndex={-1}
-                    className="mt-3 text-2xl font-bold tracking-tight text-stone-900 outline-none"
-                  >
-                    Thank you for your feedback!
-                  </h2>
-                  <p className="mt-2.5 text-sm leading-6 text-stone-600 font-medium">
-                    Thank you for your feedback! We are constantly working to improve.
-                  </p>
-                  <p className="mt-2 text-xs leading-5 text-stone-500">
-                    Your comments have been privately sent directly to management. We appreciate your honesty and will use it to make our service better.
-                  </p>
-                </div>
-
-                {/* Optional WhatsApp Resolution */}
-                {waUrl && (
-                  <div className="rounded-2xl border border-stone-200/90 bg-stone-50/80 p-4 text-left">
-                    <p className="text-xs font-semibold text-stone-700">Need immediate assistance?</p>
-                    <p className="mt-1 text-xs text-stone-500">
-                      You can also chat directly with our store team on WhatsApp.
-                    </p>
-                    <a
-                      href={waUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-[#20bd5a] transition-colors"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.43 0-2.82-.37-4.05-1.08l-.29-.17-3.12.82.83-3.04-.19-.3a8.214 8.214 0 0 1-1.26-4.46c0-4.54 3.7-8.24 8.24-8.24m4.52 11.63c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.41-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.38-.44.12-.14.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.35-.77-1.85-.2-.49-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.78 2.72 4.31 3.81.6.26 1.07.42 1.44.53.61.2 1.16.17 1.6.11.49-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.15-1.18-.06-.1-.23-.17-.48-.29" />
-                      </svg>
-                      Chat with Us on WhatsApp
-                    </a>
-                  </div>
-                )}
-
-                <p className="text-xs text-stone-400">
-                  You may safely close this page now.
-                </p>
-              </div>
-            )}
-          </section>
-        ) : (
-          /* Main Interactive Rating Form */
-          <form
-            onSubmit={handleFeedbackSubmit}
-            aria-busy={isSubmitting}
-            className="px-5 pb-7 pt-6 sm:px-8"
-          >
-            <fieldset disabled={isSubmitting} className="min-w-0">
-              <legend className="w-full text-center text-xl font-bold tracking-tight text-stone-900 sm:text-2xl">
-                How was your experience?
-              </legend>
-              <p className="mt-1 text-center text-xs text-stone-500">
-                Tap a star below to rate your visit
-              </p>
-
-              {/* 5-Star Rating Selector */}
-              <div
-                className="mt-6 flex justify-center gap-1.5 sm:gap-2.5"
-                onMouseLeave={() => setHoverRating(0)}
-                role="radiogroup"
-                aria-label="5-Star Rating Selector"
-                aria-describedby="rating-status-text"
-              >
-                {[1, 2, 3, 4, 5].map((star) => {
-                  const isFilled = displayedRating >= star;
-                  const isCurrentSelected = selectedRating === star;
-
-                  return (
-                    <label
-                      key={star}
-                      onMouseEnter={() => !isSubmitting && setHoverRating(star)}
-                      className="group relative block cursor-pointer rounded-2xl select-none"
-                    >
-                      <input
-                        type="radio"
-                        name="rating"
-                        value={star}
-                        checked={isCurrentSelected}
-                        onChange={() => handleRatingChange(star)}
-                        aria-label={`${star} star${star > 1 ? 's' : ''}: ${ratingLabels[star - 1]}`}
-                        className="peer sr-only"
-                      />
-                      <span
-                        className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-150 sm:h-14 sm:w-14 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-700 peer-focus-visible:ring-offset-2 ${
-                          isFilled
-                            ? 'bg-amber-50 text-amber-400 shadow-xs ring-1 ring-amber-200/60 scale-105'
-                            : 'text-stone-300 hover:bg-stone-50 hover:text-amber-200'
-                        } motion-safe:active:scale-95`}
-                      >
-                        <StarIcon
-                          className="h-8 w-8 sm:h-9 sm:w-9 transition-transform group-hover:scale-110"
-                          filled={isFilled}
-                        />
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-
-              {/* Dynamic Sentiment Hint */}
-              <p
-                id="rating-status-text"
-                aria-live="polite"
-                className={`mt-3 min-h-5 text-center text-xs transition-colors ${
-                  selectedRating
-                    ? 'font-semibold text-brand-800'
-                    : 'text-stone-400'
-                }`}
-              >
-                {selectedRating
-                  ? `${selectedRating} of 5 · ${ratingLabels[selectedRating - 1]}`
-                  : 'Tap 1 to 5 stars to begin'}
-              </p>
-
-              {/* Dynamic Review Textarea (appears once star is selected) */}
-              {selectedRating > 0 && (
-                <div className="mt-5 border-t border-stone-100 pt-5 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <label
-                      htmlFor="feedback-input"
-                      className="text-xs font-bold text-stone-700"
-                    >
-                      {isHighRating ? 'Share your experience' : 'What can we improve?'}
-                    </label>
-                    <span className="text-[11px] font-medium text-stone-400">
-                      Optional
-                    </span>
-                  </div>
-
-                  <textarea
-                    id="feedback-input"
-                    rows={4}
-                    maxLength={2000}
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    placeholder={
-                      isHighRating
-                        ? 'What did you enjoy most about your visit today?'
-                        : 'Please let us know what went wrong and how we can do better...'
-                    }
-                    autoCapitalize="sentences"
-                    spellCheck
-                    aria-describedby="feedback-count"
-                    className="block w-full resize-none rounded-2xl border border-stone-200 bg-stone-50/70 p-3.5 text-sm leading-6 text-stone-800 placeholder:text-stone-400 outline-none transition-all focus:border-brand-700 focus:bg-white focus:ring-2 focus:ring-brand-700/15"
-                  />
-
-                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-stone-400">
-                    <span>
-                      {!isHighRating
-                        ? 'Sent privately to management.'
-                        : card?.google_review_url
-                          ? "We'll copy it so you can paste it on Google."
-                          : 'Thank you for sharing!'}
-                    </span>
-                    <span id="feedback-count" className="tabular-nums">
-                      {feedbackText.length}/2000
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Client-Side Error Alert */}
-              {submitError && (
-                <div
-                  role="alert"
-                  className="mt-4 flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs font-medium text-rose-800"
-                >
-                  <svg className="h-4 w-4 shrink-0 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <span>{submitError}</span>
-                </div>
-              )}
-              {submitError && isHighRating && card?.google_review_url && (
-                <a
-                  href={card.google_review_url}
-                  className="mt-2 block text-center text-xs font-semibold text-brand-800 underline decoration-brand-800/40 underline-offset-4"
-                >
-                  Skip and continue to Google Reviews
-                </a>
-              )}
-
-              {/* Submit Review Button & WhatsApp Escalation */}
-              <div className="mt-6 space-y-2.5">
-                <button
-                  type="submit"
-                  disabled={!selectedRating || isSubmitting}
-                  className="relative flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-5 py-3.5 text-sm font-semibold text-white shadow-md shadow-brand-950/20 transition-all hover:bg-brand-600 hover:shadow-brand-950/30 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 disabled:shadow-none"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <span
-                        aria-hidden="true"
-                        className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-                      />
-                      <span>Submitting Feedback…</span>
-                    </>
-                  ) : (
-                    <span>
-                      {selectedRating <= 3
-                        ? 'Submit Private Feedback'
-                        : card?.google_review_url
-                          ? 'Continue to Google Reviews'
-                          : 'Submit Review'}
-                    </span>
-                  )}
-                </button>
-
-                {waUrl && selectedRating <= 3 && (
-                  <a
-                    href={waUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-xs font-semibold text-white shadow-xs hover:bg-[#20bd5a] transition-colors"
-                  >
-                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.43 0-2.82-.37-4.05-1.08l-.29-.17-3.12.82.83-3.04-.19-.3a8.214 8.214 0 0 1-1.26-4.46c0-4.54 3.7-8.24 8.24-8.24m4.52 11.63c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.41-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.38-.44.12-.14.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.35-.77-1.85-.2-.49-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.78 2.72 4.31 3.81.6.26 1.07.42 1.44.53.61.2 1.16.17 1.6.11.49-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.15-1.18-.06-.1-.23-.17-.48-.29" />
-                    </svg>
-                    <span>Chat Directly with Manager on WhatsApp</span>
-                  </a>
-                )}
-              </div>
-
-              <p className="mt-4 text-center text-[11px] text-stone-400">
-                Your feedback goes directly to {storeName}.
-              </p>
-            </fieldset>
-          </form>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {card.google_review_url ? (
+            <a href={card.google_review_url} target="_blank" rel="noopener noreferrer" onClick={trackClick} onAuxClick={(event) => { if (event.button === 1) trackClick(); }} className={`${cardClass} bg-brand-900 text-white hover:bg-brand-800`}>
+              <MapPin aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">Beri Ulasan di Google Maps</span>
+                <span className="mt-1 block text-sm leading-relaxed text-white/90">Bagikan pengalamanmu tentang rasa, suasana, dan pelayanan kami langsung di Google.</span>
+                <span className="mt-2 block text-xs text-white/85">Ulasan publik · tab baru</span>
+              </span>
+              <ArrowUpRight aria-hidden="true" className="size-4 shrink-0" />
+            </a>
+          ) : (
+            <div className={`${cardClass} border border-stone-200 bg-stone-50`}>
+              <MapPin aria-hidden="true" className="size-5 shrink-0" />
+              <span><span className="block font-semibold">Beri Ulasan di Google Maps</span><span className="text-sm text-stone-600">Tautan ulasan toko belum tersedia.</span></span>
+            </div>
+          )}
+          <button type="button" aria-haspopup="dialog" aria-controls="private-feedback" aria-disabled={status === 'pending'} onClick={startFeedback} className={`${cardClass} cursor-pointer border border-stone-200 bg-stone-50 hover:border-brand-700 aria-disabled:cursor-wait aria-disabled:opacity-60`}>
+            <MessageSquare aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-800" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">Kritik &amp; Masukan ke Manajemen</span>
+              <span className="mt-1 block text-sm leading-relaxed text-stone-700">Ada masukan soal rasa makanan, kebersihan, atau AC kurang dingin? Ceritakan langsung ke owner.</span>
+              <span className="mt-2 block text-xs text-stone-600">Formulir masukan pribadi</span>
+            </span>
+            <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-stone-600" />
+          </button>
+        </div>
+        {promo && (
+          <aside className="mt-6 space-y-2 border-t border-stone-200 pt-4">
+            {promo.image && <Image src={promo.image} alt="" width={400} height={200} unoptimized className="max-h-56 w-full rounded-xl object-cover" />}
+            {promo.title && <h2 className="font-semibold">{promo.title}</h2>}
+            {promo.message && <p className="whitespace-pre-wrap text-sm text-stone-700">{promo.message}</p>}
+            {promo.url && <a href={promo.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-800 underline">{promo.label || 'Buka tautan toko'} <ArrowUpRight aria-hidden="true" className="size-4" /></a>}
+          </aside>
         )}
       </article>
 
-      <footer className="mt-6 text-center text-xs text-stone-400">
-        Powered by Filter-Rating NFC
-      </footer>
+      <div role="status" aria-atomic="true" className="pointer-events-none fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-10 mx-auto max-w-md">
+        {status === 'pending' && <p className="rounded-xl border border-stone-200 bg-white p-3 text-sm text-stone-700 shadow-lg">Mengirim masukan…</p>}
+        {status === 'sent' && <p className="flex items-start gap-2 rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900 shadow-lg"><Check aria-hidden="true" className="mt-0.5 size-4 shrink-0" />{successMessage}</p>}
+      </div>
+
+      <dialog id="private-feedback" ref={dialog} aria-labelledby="private-feedback-title" aria-describedby="private-feedback-description" className="fixed inset-x-0 top-auto bottom-0 mx-auto mt-0 mb-0 max-h-[92dvh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-t-[2rem] border border-stone-200 bg-white px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-stone-900 shadow-xl backdrop:bg-stone-950/50 sm:px-7">
+        <div aria-hidden="true" className="mx-auto mb-2 h-1 w-8 rounded-full bg-stone-300" />
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="private-feedback-title" className="text-lg font-bold">Kritik &amp; Masukan ke Manajemen</h2>
+          <button type="button" aria-label="Tutup" onClick={() => dialog.current.close()} className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-brand-700"><X aria-hidden="true" className="size-5" /></button>
+        </div>
+        <p id="private-feedback-description" className="mb-4 text-sm text-stone-600">Masukan ini dikirim secara pribadi ke manajemen.</p>
+        <form onSubmit={submitFeedback} className="space-y-4">
+          {!tableNumber && (
+            <label className="block text-sm font-medium">
+              Nomor meja (opsional)
+              <input name="table_number" maxLength={20} className={fieldClass} />
+            </label>
+          )}
+          <fieldset>
+            <legend className="text-sm font-medium">Pilih kategori</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {FEEDBACK_CATEGORIES.map((category) => (
+                <label key={category} className="cursor-pointer">
+                  <input type="radio" name="category" value={category} required className="peer sr-only" />
+                  <span className="flex min-h-11 items-center rounded-full border border-stone-300 px-3 text-sm peer-checked:border-brand-800 peer-checked:bg-brand-50 peer-checked:font-semibold peer-checked:text-brand-900 peer-focus-visible:outline-2 peer-focus-visible:outline-brand-700">{category}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <label className="block text-sm font-medium">
+            Masukan Anda
+            <textarea ref={textarea} name="feedback_text" required rows={3} maxLength={2000} placeholder="Tuliskan keluhan atau masukan Anda di sini..." className={fieldClass} />
+          </label>
+          <div>
+            <label htmlFor="feedback-contact" className="block text-sm font-medium">Nomor WhatsApp (opsional)</label>
+            <input id="feedback-contact" name="customer_contact" type="tel" autoComplete="tel" maxLength={30} placeholder="Nomor WhatsApp (opsional, jika ingin dihubungi kembali)" aria-describedby="feedback-contact-hint" className={fieldClass} />
+            <p id="feedback-contact-hint" className="mt-1 text-sm text-stone-600">Isi jika ingin dihubungi kembali oleh manajemen.</p>
+          </div>
+          {error && <p role="alert" className="text-sm text-rose-800">{error}</p>}
+          <button type="submit" disabled={status === 'pending'} className="min-h-11 w-full rounded-xl bg-brand-900 px-4 font-semibold text-white hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60">Kirim masukan</button>
+        </form>
+      </dialog>
     </main>
   );
 }

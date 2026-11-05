@@ -209,12 +209,14 @@ describe('dispatchLowRatingAlert', () => {
 
 describe('collectDigestTargets', () => {
   it('dedupes WhatsApp numbers and Telegram chats across cards with alerts enabled', () => {
+    const active = { is_active: true, alerts_enabled: true };
     const cards = [
-      { whatsapp_number: '081234567890', alert_whatsapp: null, alert_telegram_chat_id: '123456789' },
-      { whatsapp_number: '6281234567890', alert_telegram_chat_id: '123456789' },
-      { whatsapp_number: '081111111111', alerts_enabled: false, alert_telegram_chat_id: '-1009999999999' },
-      { alert_whatsapp: '6289876543210' },
-      {},
+      { ...active, alert_whatsapp: '081234567890', alert_telegram_chat_id: '123456789' },
+      { ...active, alert_whatsapp: '6281234567890', alert_telegram_chat_id: '123456789' },
+      { ...active, alerts_enabled: false, alert_telegram_chat_id: '-1009999999999' },
+      { ...active, is_active: false, alert_telegram_chat_id: '-1008888888888' },
+      { ...active, alert_whatsapp: '6289876543210' },
+      { ...active, whatsapp_number: '6285555555555' },
     ];
 
     expect(collectDigestTargets(cards)).toEqual({

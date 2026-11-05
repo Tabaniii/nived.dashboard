@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireRole } from '@/lib/auth/session';
 import { buildCardSlug, cardPublicUrl } from '@/lib/slug';
 import { generateTempPassword } from '@/lib/password';
-import { sanitizeReviewUrl } from '@/lib/validation';
+import { getGoogleReviewLink } from '@/lib/customer-feedback';
 import { normalizePhoneNumber } from '@/lib/whatsapp';
 
 async function assertAdmin() {
@@ -38,11 +38,39 @@ export async function provisionMerchantAction(formData) {
 
   const password = customPassword || generateTempPassword();
 
+  const { data: userData, error: userError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: ownerName },
+    app_metadata: { role: 'client' },
+  });
+  if (userError) return { error: userError.message };
+  const ownerId = userData.user.id;
+
+  async function removeIncompleteOwner(merchantId) {
+    if (merchantId) {
+      const { error } = await admin.from('merchants').delete().eq('id', merchantId);
+      if (error) {
+        console.error('[admin] Could not roll back merchant provisioning:', error.code);
+        return;
+      }
+    }
+    const { error: profileError } = await admin.from('profiles').delete().eq('id', ownerId);
+    const { error: authError } = await admin.auth.admin.deleteUser(ownerId);
+    if (profileError || authError) {
+      console.error('[admin] Could not roll back owner provisioning:', profileError?.code || authError?.code);
+    }
+  }
+
   const { data: merchant, error: merchantError } = await admin
     .from('merchants')
     .insert({
+      name: businessName,
       business_name: businessName,
       owner_name: ownerName,
+      owner_id: ownerId,
+      owner_user_id: ownerId,
       contact,
       status: ['trial', 'active', 'suspended'].includes(status) ? status : 'trial',
     })
@@ -50,31 +78,21 @@ export async function provisionMerchantAction(formData) {
     .single();
 
   if (merchantError) {
+    await removeIncompleteOwner();
     return { error: merchantError.message };
   }
 
-  const { data: userData, error: userError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: ownerName },
-    app_metadata: { role: 'client', merchant_id: merchant.id },
-  });
-
-  if (userError) {
-    await admin.from('merchants').delete().eq('id', merchant.id);
-    return { error: userError.message };
-  }
-
   const { error: profileError } = await admin.from('profiles').upsert({
-    id: userData.user.id,
+    id: ownerId,
     email,
     role: 'client',
+    dashboard_role: 'owner',
     full_name: ownerName,
     merchant_id: merchant.id,
   });
 
   if (profileError) {
+    await removeIncompleteOwner(merchant.id);
     return { error: profileError.message };
   }
 
@@ -107,7 +125,7 @@ export async function provisionCardAction(formData, baseUrl) {
     return { error: 'Merchant, nama toko, dan Google Review URL wajib.' };
   }
 
-  const googleReviewUrl = sanitizeReviewUrl(rawGoogleReviewUrl);
+  const googleReviewUrl = getGoogleReviewLink(rawGoogleReviewUrl);
   if (!googleReviewUrl) {
     return { error: 'Google Review URL harus berupa URL yang valid (contoh: https://g.page/r/.../review).' };
   }
@@ -142,6 +160,7 @@ export async function provisionCardAction(formData, baseUrl) {
       google_review_url: googleReviewUrl,
       whatsapp_number: whatsappNumber || null,
       is_shield_active: isShieldActive,
+      is_active: true,
     })
     .select()
     .single();

@@ -1,5 +1,6 @@
 import LoginForm from './LoginForm';
 import ThemeToggle from '@/components/theme/ThemeToggle';
+import { UNAUTHORIZED_MESSAGE } from '@/lib/auth/portal';
 
 /** Blocking route: reads searchParams for suspended/error banners (cacheComponents). */
 export const instant = false;
@@ -14,6 +15,9 @@ export default async function AuthPortalPage({ searchParams }) {
   let bannerError = null;
   if (params?.error === 'suspended') {
     bannerError = 'Akses merchant ditangguhkan. Hubungi Nived.';
+  }
+  if (params?.error === 'unauthorized') {
+    bannerError = UNAUTHORIZED_MESSAGE;
   }
 
   return (
@@ -38,7 +42,7 @@ export default async function AuthPortalPage({ searchParams }) {
         <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
           Masuk dengan akun yang diberikan tim Nived. Tidak ada pendaftaran mandiri.
         </p>
-        <LoginForm bannerError={bannerError} />
+        <LoginForm bannerError={bannerError} requestedPath={typeof params?.redirect === 'string' ? params.redirect : null} />
       </div>
     </div>
   );

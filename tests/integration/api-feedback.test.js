@@ -1,148 +1,127 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { POST } from '@/app/api/feedback/route';
-import { resetMockStore, getMockStore } from '@/lib/db';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { POST as submitFeedback } from '@/app/api/feedback/route';
+import { POST as logReviewClick } from '@/app/api/feedback/google-click/route';
+import { getCardById } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 
-describe('API: POST /api/feedback', () => {
-  const validCardId = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d'; // demo-card
+vi.mock('@/lib/db', () => ({ getCardById: vi.fn() }));
+vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }));
 
-  beforeEach(() => {
-    resetMockStore();
+const cardId = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
+const storeId = 'b11deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
+const card = {
+  merchant_id: storeId,
+  slug: 'kopi-senja-meja-12',
+  is_active: true,
+  google_review_url: 'https://search.google.com/local/writereview?placeid=ChIJ12345',
+};
+const feedback = {
+  card_id: cardId,
+  category: 'Kecepatan Pelayanan',
+  feedback_text: 'Pelayanan agak lama saat makan siang.',
+};
+const from = vi.fn();
+const insert = vi.fn();
+
+function request(body, endpoint = '') {
+  return new Request(`http://localhost/api/feedback${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
+}
 
-  it('records feedback successfully for 1-5 star ratings', async () => {
-    const payload = {
-      card_id: validCardId,
-      rating: 2,
-      feedback_text: 'Pelayanan agak lama saat jam makan siang',
-    };
+beforeEach(() => {
+  vi.resetAllMocks();
+  getCardById.mockResolvedValue(card);
+  createClient.mockResolvedValue({ from });
+  from.mockReturnValue({ insert });
+  insert.mockResolvedValue({ error: null });
+});
 
-    const req = new Request('http://localhost:3000/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+describe('POST /api/feedback', () => {
+  it('attributes the feedback to the saved table and store without a rating', async () => {
+    const response = await submitFeedback(request({
+      ...feedback,
+      table_number: '99',
+      store_id: 'untrusted-store',
+      sentiment_tag: 'positive',
+      resolved_status: true,
+      customer_contact: '  +62 812 3456 7890  ',
+    }));
 
-    const res = await POST(req);
-    expect(res.status).toBe(201);
-
-    const body = await res.json();
-    expect(body.success).toBe(true);
-    expect(body.message).toBe('Feedback submitted successfully');
-
-    const store = getMockStore();
-    expect(store.feedbacks).toHaveLength(1);
-    expect(store.feedbacks[0].card_id).toBe(validCardId);
-    expect(store.feedbacks[0].rating).toBe(2);
-    expect(store.feedbacks[0].feedback_text).toBe(payload.feedback_text);
-  });
-
-  it('allows optional feedback_text to be empty (TM-09)', async () => {
-    const payload = {
-      card_id: validCardId,
-      rating: 1,
-      feedback_text: '',
-    };
-
-    const req = new Request('http://localhost:3000/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const res = await POST(req);
-    expect(res.status).toBe(201);
-
-    const store = getMockStore();
-    expect(store.feedbacks).toHaveLength(1);
-    expect(store.feedbacks[0].rating).toBe(1);
-  });
-
-  it('accepts a 5-star rating submitted from the slug page', async () => {
-    const payload = {
-      card_id: validCardId,
-      rating: 5,
-      feedback_text: 'Great place',
-    };
-
-    const req = new Request('http://localhost:3000/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const res = await POST(req);
-    expect(res.status).toBe(201);
-
-    const body = await res.json();
-    expect(body.success).toBe(true);
-
-    const store = getMockStore();
-    expect(store.feedbacks).toHaveLength(1);
-    expect(store.feedbacks[0].rating).toBe(5);
-  });
-
-  it('rejects invalid or missing card_id with 400 Bad Request', async () => {
-    const payload = {
-      card_id: 'invalid-uuid-format',
-      rating: 2,
-    };
-
-    const req = new Request('http://localhost:3000/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 404 if card does not exist in database', async () => {
-    const nonExistentCardId = '11111111-2222-3333-4444-555555555555';
-    const payload = {
-      card_id: nonExistentCardId,
-      rating: 2,
-    };
-
-    const req = new Request('http://localhost:3000/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const res = await POST(req);
-    expect(res.status).toBe(404);
-  });
-
-  it('stores staff and table attribution from the request body', async () => {
-    const req = new Request('http://localhost:3000/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        card_id: validCardId,
-        rating: 3,
-        feedback_text: 'Agak lama',
-        staff_code: 'Budi',
-        table_code: 'vip 2',
-      }),
-    });
-
-    const res = await POST(req);
-    expect(res.status).toBe(201);
-    expect(getMockStore().feedbacks[0]).toMatchObject({
-      staff_code: 'budi',
-      table_code: 'VIP-2',
+    expect(response.status).toBe(201);
+    expect(getCardById).toHaveBeenCalledWith(cardId);
+    expect(from).toHaveBeenCalledWith('customer_feedback');
+    expect(insert).toHaveBeenCalledWith({
+      store_id: storeId,
+      table_number: '12',
+      category: 'Kecepatan Pelayanan',
+      feedback_text: feedback.feedback_text,
+      customer_contact: '+62 812 3456 7890',
     });
   });
 
-  it('handles invalid JSON payload gracefully', async () => {
-    const req = new Request('http://localhost:3000/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: 'invalid-json{',
-    });
+  it('accepts anonymous feedback and sanitizes table attribution on shared cards', async () => {
+    getCardById.mockResolvedValue({ ...card, slug: 'kopi-senja-01' });
 
-    const res = await POST(req);
-    expect(res.status).toBe(400);
+    const response = await submitFeedback(request({ ...feedback, table_number: 'vip 2' }));
+
+    expect(response.status).toBe(201);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      table_number: 'VIP-2',
+      customer_contact: null,
+    }));
+  });
+
+  it.each([
+    { card_id: 'invalid-uuid' },
+    { feedback_text: '   ' },
+    { category: undefined },
+    { category: 'Bukan kategori' },
+    { customer_contact: '......' },
+  ])('rejects invalid input before attempting an insert (%o)', async (fields) => {
+    const response = await submitFeedback(request({ ...feedback, ...fields }));
+
+    expect(response.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it.each([null, { ...card, is_active: false }, { ...card, merchant_id: null }])(
+    'rejects unavailable cards (%o)',
+    async (unavailableCard) => {
+      getCardById.mockResolvedValue(unavailableCard);
+      const response = await submitFeedback(request(feedback));
+
+      expect(response.status).toBe(404);
+      expect(insert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects malformed JSON', async () => {
+    const response = await submitFeedback(new Request('http://localhost/api/feedback', {
+      method: 'POST',
+      body: '{',
+    }));
+
+    expect(response.status).toBe(400);
+  });
+});
+
+describe('POST /api/feedback/google-click', () => {
+  it('records the store and the recognized table independently of private feedback', async () => {
+    const response = await logReviewClick(request({ card_id: cardId }, '/google-click'));
+
+    expect(response.status).toBe(204);
+    expect(from).toHaveBeenCalledWith('review_click_events');
+    expect(insert).toHaveBeenCalledWith({ store_id: storeId, table_number: '12' });
+  });
+
+  it('rejects events for a card without a Google Maps destination', async () => {
+    getCardById.mockResolvedValue({ ...card, google_review_url: 'https://example.com' });
+    const response = await logReviewClick(request({ card_id: cardId }, '/google-click'));
+
+    expect(response.status).toBe(404);
+    expect(insert).not.toHaveBeenCalled();
   });
 });

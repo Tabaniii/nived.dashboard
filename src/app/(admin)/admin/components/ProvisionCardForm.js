@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import QRCode from 'qrcode';
-import { CreditCard, Copy, Check, Download, ExternalLink, ShieldCheck, Store, Phone, MapPin, Loader2 } from 'lucide-react';
+import { CreditCard, Copy, Check, Download, ExternalLink, Store, Phone, MapPin, Loader2 } from 'lucide-react';
 import { provisionCardAction } from '../actions';
 import { getBaseUrl } from '@/lib/url';
 import { normalizePhoneNumber } from '@/lib/whatsapp';
@@ -134,22 +134,6 @@ export default function ProvisionCardForm({ merchants }) {
             className={fieldClass}
             placeholder="081234567890 → 6281234567890"
           />
-        </div>
-
-        <div className="sm:col-span-2">
-          <label className="flex items-center gap-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/60 p-3 text-xs text-zinc-800 dark:text-zinc-200 cursor-pointer shadow-xs">
-            <input
-              type="checkbox"
-              name="is_shield_active"
-              value="true"
-              defaultChecked
-              className="size-4 rounded border-zinc-300 dark:border-zinc-700 text-brand-500 accent-brand-500 cursor-pointer"
-            />
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="size-4 text-brand-600 dark:text-brand-400" />
-              <span className="font-medium">Aktifkan Shield Mode (Reputation Filter 4–5★ vs 1–3★)</span>
-            </div>
-          </label>
         </div>
 
         <div className="sm:col-span-2 pt-2">

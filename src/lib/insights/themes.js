@@ -159,25 +159,26 @@ function joinIndonesian(parts) {
  *
  * @param {Array<{ rating: number, feedback_text?: string|null, created_at?: string, table_code?: string|null }>} feedbacks
  */
-export function buildRuleBasedSummary(feedbacks = []) {
+export function buildRuleBasedSummary(feedbacks = [], { privateFeedback = false } = {}) {
   const feedbackCount = feedbacks.length;
   const ratings = feedbacks.map((f) => Number(f.rating)).filter((r) => r >= 1 && r <= 5);
   const avgRating = ratings.length
     ? Math.round((ratings.reduce((sum, r) => sum + r, 0) / ratings.length) * 10) / 10
     : null;
   const complaints = feedbacks.filter((f) => {
+    if (privateFeedback) return f.sentiment_tag === 'negative';
     const rating = Number(f.rating);
     return rating >= 1 && rating <= 3;
   });
 
   const stats = new Map();
-  for (const complaint of complaints) {
+  for (const complaint of privateFeedback ? feedbacks : complaints) {
     for (const id of detectThemes(complaint.feedback_text)) {
       if (!stats.has(id)) stats.set(id, { count: 0, buckets: new Map(), tables: new Map() });
       const stat = stats.get(id);
       stat.count += 1;
       increment(stat.buckets, getTimeBucket(complaint.created_at));
-      increment(stat.tables, complaint.table_code);
+      increment(stat.tables, complaint.table_number || complaint.table_code);
     }
   }
 
@@ -205,8 +206,17 @@ export function buildRuleBasedSummary(feedbacks = []) {
   let summary;
   let actions;
   if (feedbackCount === 0) {
-    summary = 'Belum ada masukan pelanggan dalam 7 hari terakhir.';
-    actions = ['Pastikan kartu NFC dan QR mudah dijangkau pelanggan di setiap meja.'];
+    summary = privateFeedback
+      ? 'Belum ada kritik privat meja yang masuk minggu ini. Semua operasional meja terpantau aman.'
+      : 'Belum ada masukan pelanggan dalam 7 hari terakhir.';
+    actions = privateFeedback ? [] : ['Pastikan kartu NFC dan QR mudah dijangkau pelanggan di setiap meja.'];
+  } else if (privateFeedback) {
+    const topics = themes.slice(0, 3).map((theme) => `${theme.label} (${theme.count})`);
+    const suggestion = 'Tinjau masukan terbaru dan tentukan satu hal yang bisa diperbaiki minggu depan.';
+    summary = `Ada ${feedbackCount} masukan pribadi dalam 7 hari terakhir. ${topics.length
+      ? `Topik yang terdeteksi: ${joinIndonesian(topics)}.`
+      : 'Belum ada topik yang bisa dirangkum secara otomatis.'} ${suggestion}`;
+    actions = [suggestion];
   } else if (complaints.length === 0) {
     summary = `Tidak ada keluhan 1–3★ minggu ini — ${feedbackCount} masukan positif masuk. Pertahankan!`;
     actions = ['Apresiasi tim atas pelayanan minggu ini dan pertahankan standar yang sama.'];

@@ -1,43 +1,46 @@
-import { NextResponse } from 'next/server';
+import { unstable_rethrow } from 'next/navigation';
 import { updateCardSettingsAction } from '@/app/(dashboard)/dashboard/actions';
-import { getClientContext, getClientCards } from '@/app/(dashboard)/dashboard/queries';
+import { getClientCards } from '@/app/(dashboard)/dashboard/queries';
+import { authorizeDashboardRequest, dashboardJson } from '../access';
 
 export const instant = false;
 
-export async function GET() {
-  const ctx = await getClientContext();
-  if (!ctx) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export async function GET(request) {
   try {
-    const cards = await getClientCards(ctx.profile.merchant_id);
-    return NextResponse.json({ cards });
+    const { ctx, error } = await authorizeDashboardRequest(request);
+    if (error) return error;
+
+    const cards = await getClientCards(ctx.merchant.id);
+    return dashboardJson({ cards });
   } catch (error) {
+    unstable_rethrow(error);
     console.error('[api/dashboard/settings GET]', error);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return dashboardJson({ error: 'Database error' }, 500);
   }
 }
 
 /**
- * Body JSON: { card_id, google_review_url, whatsapp_number?, store_name? }
+ * Body JSON: { card_id, google_review_url?, store_id?, whatsapp_number?, store_name? }
  */
 export async function PATCH(request) {
-  const ctx = await getClientContext();
-  if (!ctx) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { ctx, error } = await authorizeDashboardRequest(request);
+  if (error) return error;
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    return dashboardJson({ error: 'Invalid JSON payload' }, 400);
+  }
+  if (body?.store_id != null && body.store_id !== ctx.merchant.id) {
+    return dashboardJson({ error: 'Store access denied' }, 403);
   }
 
   const formData = new FormData();
   formData.set('card_id', String(body?.card_id || ''));
-  formData.set('google_review_url', String(body?.google_review_url || ''));
+  if (body?.google_review_url != null) {
+    formData.set('google_review_url', String(body.google_review_url));
+  }
   if (body?.whatsapp_number != null) {
     formData.set('whatsapp_number', String(body.whatsapp_number));
   }
@@ -45,10 +48,10 @@ export async function PATCH(request) {
     formData.set('store_name', String(body.store_name));
   }
 
-  const result = await updateCardSettingsAction(formData);
+  const result = await updateCardSettingsAction(formData, ctx.merchant.id);
   if (result?.error) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+    return dashboardJson({ error: result.error }, 400);
   }
 
-  return NextResponse.json({ success: true });
+  return dashboardJson({ success: true });
 }

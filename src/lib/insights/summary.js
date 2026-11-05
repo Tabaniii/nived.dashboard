@@ -6,13 +6,13 @@ import { DEFAULT_GEMINI_MODEL, summarizeWithGemini } from '@/lib/insights/gemini
  * written feedback to analyze, otherwise (or on any AI error) keyword rules.
  *
  * @param {Array<Object>} feedbacks
- * @param {{ env?: Record<string, string|undefined>, fetchImpl?: typeof fetch, storeNames?: string[] }} [options]
+ * @param {{ env?: Record<string, string|undefined>, fetchImpl?: typeof fetch, storeName?: string }} [options]
  */
 export async function generateFeedbackSummary(
   feedbacks = [],
-  { env = process.env, fetchImpl = fetch, storeNames = [] } = {}
+  { env = process.env, fetchImpl = fetch, storeName } = {}
 ) {
-  const base = buildRuleBasedSummary(feedbacks);
+  const base = buildRuleBasedSummary(feedbacks, { privateFeedback: storeName !== undefined });
   const apiKey = (env.GEMINI_API_KEY || '').trim();
   const hasWrittenFeedback = feedbacks.some(
     (f) => typeof f.feedback_text === 'string' && f.feedback_text.trim()
@@ -25,24 +25,18 @@ export async function generateFeedbackSummary(
       apiKey,
       model: env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
       fetchImpl,
-      context: {
-        storeNames,
-        feedbackCount: base.feedbackCount,
-        complaintCount: base.complaintCount,
-        avgRating: base.avgRating,
-        ruleThemes: base.themes,
-      },
+      context: { storeName },
     });
 
     return {
       ...base,
       summary: ai.summary,
       themes: ai.themes.length ? ai.themes : base.themes,
-      actions: ai.actions.length ? ai.actions : base.actions,
+      actions: ai.actions.length ? ai.actions.slice(0, 1) : base.actions,
       source: 'ai',
     };
   } catch (err) {
-    console.warn('[insights] Gemini summary failed, using keyword fallback:', err?.message || err);
+    console.warn('[insights] Gemini summary failed, using keyword fallback:', err?.name);
     return base;
   }
 }

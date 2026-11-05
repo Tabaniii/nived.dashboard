@@ -45,7 +45,7 @@ export default function SocialProofStudio({ reviews = [], initialReviewId = '' }
 
       {reviews.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center text-xs text-zinc-500">
-          Belum ada ulasan 5★ yang berisi cerita. Ulasan yang ditulis pelanggan di kotak cerita 4–5★ akan muncul di sini.
+          Belum ada ulasan tertulis dari arsip formulir rating lama.
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-[1fr_auto]">

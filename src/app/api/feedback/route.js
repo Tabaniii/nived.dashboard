@@ -1,110 +1,47 @@
-import { NextResponse } from 'next/server';
-import { isValidUUID, isValidRating, sanitizeText } from '@/lib/validation';
-import { getCardById, createFeedback } from '@/lib/db';
-import { getReviewOutcome } from '@/lib/review-routing';
-import { sanitizeStaffCode, sanitizeTableCode } from '@/lib/attribution';
-import { scheduleLowRatingAlert } from '@/lib/alerts';
-import { getClientMeta } from '@/lib/client-meta';
-import { hashIp } from '@/lib/debounce';
+import { getCardById } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
+import { FEEDBACK_CATEGORIES, resolveTableNumber } from '@/lib/customer-feedback';
+import { isValidUUID, sanitizeText } from '@/lib/validation';
 
-/**
- * POST /api/feedback
- * Records customer ratings and optional internal feedback for 1-5 stars.
- */
 export async function POST(request) {
   let body;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      { error: 'Invalid JSON payload' },
-      { status: 400 }
-    );
+    return Response.json({ error: 'Permintaan tidak valid.' }, { status: 400 });
   }
 
-  const { card_id, rating, feedback_text, customer_whatsapp, staff_code, table_code } = body || {};
-
-  // 1. Validate card_id (must be valid UUID format)
-  if (!card_id || !isValidUUID(card_id)) {
-    return NextResponse.json(
-      { error: 'Validation error', message: 'Valid card_id (UUID) is required' },
-      { status: 400 }
-    );
+  const { card_id, category, feedback_text, customer_contact, table_number } = body || {};
+  const feedbackText = sanitizeText(feedback_text);
+  const contact = sanitizeText(customer_contact, 30);
+  if (!isValidUUID(card_id) || !feedbackText) {
+    return Response.json({ error: 'Kartu dan isi masukan wajib diisi.' }, { status: 400 });
+  }
+  if (!FEEDBACK_CATEGORIES.includes(category)) {
+    return Response.json({ error: 'Kategori masukan tidak valid.' }, { status: 400 });
+  }
+  if (contact && (!/^\+?[\d ().-]+$/.test(contact) || contact.replace(/\D/g, '').length < 6)) {
+    return Response.json({ error: 'Nomor telepon atau WhatsApp tidak valid.' }, { status: 400 });
   }
 
-  // 2. Validate rating (strictly integer between 1 and 5)
-  if (!isValidRating(rating, 1, 5)) {
-    return NextResponse.json(
-      {
-        error: 'Validation error',
-        message: 'Rating must be an integer between 1 and 5',
-      },
-      { status: 400 }
-    );
-  }
-
-  if (feedback_text != null && typeof feedback_text !== 'string') {
-    return NextResponse.json(
-      { error: 'Validation error', message: 'Feedback must be text' },
-      { status: 400 }
-    );
-  }
-
-  // 3. Verify card exists (and is not soft-deleted)
-  const card = await getCardById(card_id.trim());
-  if (!card) {
-    return NextResponse.json(
-      { error: 'Card not found', message: 'The referenced card does not exist' },
-      { status: 404 }
-    );
-  }
-
-  // 4. Sanitize feedback text + optional customer WhatsApp
-  const sanitizedText = sanitizeText(feedback_text || '', 2000);
-  const sanitizedWa = sanitizeText(customer_whatsapp || '', 30).replace(
-    /[^\d+]/g,
-    ''
-  );
-
-  // 5. Persist to database
   try {
-    const feedback = await createFeedback({
-      card_id: card.id,
-      rating: Number(rating),
-      feedback_text: sanitizedText,
-      customer_whatsapp: sanitizedWa || null,
-      staff_code: sanitizeStaffCode(staff_code),
-      table_code: sanitizeTableCode(table_code),
-    });
-
-    if (!feedback) {
-      return NextResponse.json(
-        { error: 'Database error', message: 'Failed to record feedback' },
-        { status: 500 }
-      );
+    const card = await getCardById(card_id.trim());
+    if (!card?.merchant_id || card.is_active === false || card.deleted_at) {
+      return Response.json({ error: 'Toko untuk kartu ini tidak tersedia.' }, { status: 404 });
     }
 
-    scheduleLowRatingAlert({
-      card,
-      feedback,
-      sourceKey: hashIp(getClientMeta(request.headers).clientIp),
+    const supabase = await createClient();
+    const { error } = await supabase.from('customer_feedback').insert({
+      store_id: card.merchant_id,
+      table_number: resolveTableNumber(card.slug, table_number),
+      category,
+      feedback_text: feedbackText,
+      customer_contact: contact || null,
     });
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Feedback submitted successfully',
-        id: feedback.id,
-        feedback_text: sanitizedText,
-        ...getReviewOutcome(Number(rating), card.google_review_url),
-      },
-      { status: 201 }
-    );
+    if (error) throw error;
+    return Response.json({ success: true }, { status: 201 });
   } catch (error) {
-    console.error('[api/feedback] Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Database error', message: 'An unexpected error occurred' },
-      { status: 500 }
-    );
+    console.error('[api/feedback] Insert failed:', error?.code);
+    return Response.json({ error: 'Masukan belum terkirim. Silakan coba lagi.' }, { status: 500 });
   }
 }

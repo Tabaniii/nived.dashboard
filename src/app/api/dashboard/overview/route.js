@@ -1,34 +1,28 @@
-import { NextResponse } from 'next/server';
-import {
-  getClientContext,
-  getClientDashboardData,
-} from '@/app/(dashboard)/dashboard/queries';
+import { unstable_rethrow } from 'next/navigation';
+import { getClientDashboardData } from '@/app/(dashboard)/dashboard/queries';
+import { authorizeDashboardRequest, dashboardJson } from '../access';
 
 export const instant = false;
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const ctx = await getClientContext();
-    if (!ctx) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { ctx, error } = await authorizeDashboardRequest(request);
+    if (error) return error;
 
-    if (ctx.merchant?.status === 'suspended') {
-      return NextResponse.json({ error: 'Merchant suspended' }, { status: 403 });
-    }
-
-    const data = await getClientDashboardData(ctx.profile.merchant_id);
-    return NextResponse.json({
+    const data = await getClientDashboardData(ctx.merchant.id);
+    return dashboardJson({
       merchant: ctx.merchant,
       profile: {
         email: ctx.profile.email,
         full_name: ctx.profile.full_name,
         role: ctx.profile.role,
+        dashboard_role: ctx.profile.dashboard_role,
       },
       ...data,
     });
   } catch (error) {
+    unstable_rethrow(error);
     console.error('[api/dashboard/overview]', error);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return dashboardJson({ error: 'Database error' }, 500);
   }
 }

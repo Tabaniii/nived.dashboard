@@ -7,9 +7,9 @@ declare
   u uuid := gen_random_uuid(); foreign_order uuid := gen_random_uuid();
   rejected boolean;
 begin
-  insert into merchants(id,business_name,owner_name) values(m,'Dashboard access test','Test'),(other_m,'Other access test','Test');
-  insert into outlets(id,name,merchant_id) values(o,'Test',m),(other_o,'Other',other_m);
   insert into auth.users(id,email) values(u,'dashboard-test-'||u||'@example.invalid');
+  insert into merchants(id,business_name,owner_name,owner_user_id) values(m,'Dashboard access test','Test',u),(other_m,'Other access test','Test',u);
+  insert into outlets(id,name,merchant_id) values(o,'Test',m),(other_o,'Other',other_m);
   update profiles set role='cashier',merchant_id=m,outlet_id=o,is_active=false where id=u;
   rejected := false;
   begin

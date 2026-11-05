@@ -2,37 +2,35 @@
 
 Panduan singkat untuk pemilik toko / merchant yang memakai dashboard di `dashboard.nived.studio`.
 
-Setelah login, Anda akan melihat menu: **Overview**, **Mode Kartu**, **Staff & Meja**, **Promosi**, dan **Settings**.
+Setelah login, Anda akan melihat menu: **Overview**, **Reviews & Feedback**, **Link Google Maps**, **Staff & Meja**, dan **Settings**.
 
 ---
 
 ## 1. Overview
 
-Ringkasan performa kartu NFC/QR Anda:
+Ringkasan toko dari database bersama:
 
-- Total tap / scan
-- Distribusi rating bintang
-- Masukan privat dari pelanggan (rating rendah)
-
-Gunakan halaman ini untuk cek apakah kartu sedang dipakai pelanggan.
+- Penjualan POS hari ini dalam zona waktu WIB
+- Pesanan meja yang belum selesai
+- Klik tautan ulasan Google selama tujuh hari terakhir
+- Jumlah dan masukan pribadi terbaru
 
 ---
 
-## 2. Mode Kartu
+## Reputation & Feedback Hub
 
-**Fungsi:** mengganti perilaku kartu NFC & QR tanpa mengganti link fisik yang sudah ditempel di meja.
+Pantau jumlah klik Google selama tujuh hari terakhir dan total masukan pribadi. Gunakan sakelar di setiap masukan untuk menandai tindak lanjut yang selesai. Pilih **Generate / Refresh AI Summary** untuk membuat ringkasan tujuh hari terakhir, lalu pilih **Salin ke WhatsApp** untuk membagikan pesan secara manual.
 
-Pilih kartu toko (mis. `sudirman-01`), lalu pilih salah satu mode:
+## 2. Link Google Maps
 
-| Mode | Apa yang terjadi saat pelanggan tap/scan |
-|------|------------------------------------------|
-| **Review** | Rating 4–5★ diarahkan ke Google; 1–3★ ke kotak masukan privat |
-| **Promo** | Tampilkan promo / menu spesial dulu; tombol “Rate your visit” tetap ada |
-| **Redirect** | Langsung buka link lain (menu digital, Instagram, katalog WhatsApp, dll.) |
+Buka **Link Google Maps** (`/dashboard/review-link`), masukkan tautan langsung ulasan dari Google Business Profile, lalu simpan. Tautan ini berlaku untuk seluruh kartu NFC dan QR toko yang belum dihapus.
 
-Klik **Terapkan Mode …** agar perubahan aktif.
+Format yang diterima:
 
-> Link di meja **tidak perlu diganti**. Mode hanya mengubah perilaku di belakang link yang sama.
+- `https://g.page/r/[kode]/review`
+- `https://search.google.com/local/writereview?placeid=[place_id]`
+
+Link fisik di meja tetap sama. Halaman pelanggan tetap menyediakan pilihan ulasan Google dan masukan pribadi.
 
 ---
 
@@ -45,7 +43,7 @@ Klik **Terapkan Mode …** agar perubahan aktif.
 1. Pilih kartu toko
 2. Isi **Nama staf** (opsional), mis. `Andi`
 3. Isi **Meja** (opsional), mis. `12`
-4. Klik **Salin** — tulis link itu ke stiker NFC (mis. lewat NFC Tools), atau klik **Buat QR** untuk unduh QR di halaman Promosi
+4. Klik **Salin** — tulis link itu ke stiker NFC (mis. lewat NFC Tools), atau klik **Buat QR** untuk menuju generator QR di halaman yang sama
 
 Contoh:
 
@@ -56,34 +54,25 @@ Filter periode (**Bulan ini** / **Bulan lalu** / **30 hari terakhir**) mengatur 
 
 ---
 
-## 4. Promosi
+### Unduh QR Code Kartu
 
-### QR Code Kartu
-
-1. Pilih kartu toko
+1. Pilih kartu toko di bagian **QR Code Kartu**
 2. (Opsional) isi meja / staf agar QR spesifik per meja atau staf
 3. Unduh **PNG**
 
-### Social Proof Instagram
-
-Ubah ulasan 5★ pelanggan jadi gambar Story (9:16) atau Post (1:1) untuk diunggah ke Instagram. Nama dan nomor pelanggan tidak ditampilkan.
-
 ---
 
-## 5. Settings (Pengaturan Toko)
+## 4. Settings (Pengaturan Toko)
 
 Pilih kartu toko, lalu atur:
 
 | Field | Kegunaan |
 |-------|----------|
 | **Nama Toko / Restoran** | Nama yang tampil di halaman pelanggan |
-| **Google Review URL** | Tujuan pelanggan yang kasih 4–5★ (pakai *direct review intent URL*) |
-| **WhatsApp Manager / Toko** | Nomor chat untuk pelanggan 1–3★ (boleh ketik `08…`, otomatis jadi `628…`) |
-| **Alert Instan Rating 1–3★** | Notifikasi cepat saat ada rating jelek |
+| **URL Logo Toko** | Gambar logo di halaman pelanggan |
+| **Pengiriman Ringkasan Mingguan** | Pengiriman opsional ke nomor WhatsApp atau chat Telegram yang Anda isi |
 
 Di bagian atas ada **Tautan Publik Kartu NFC** — ini link yang tertulis di kartu/NFC/QR fisik. Tombol **Salin** / **Tes URL** untuk cek.
-
-**Shield Mode** (aktif/nonaktif) hanya dikontrol Admin Nived sesuai langganan.
 
 ---
 
@@ -98,7 +87,7 @@ https://dashboard.nived.studio/r/[slug-kartu]
 contoh: `/r/sudirman-01`
 
 - Slug (`sudirman-01`) dibuat sekali saat kartu di-*provision* oleh Admin Nived.
-- Client **boleh** mengubah nama toko, Google URL, WhatsApp, mode kartu, dll.
+- Client **boleh** mengubah nama toko, logo, dan WhatsApp di **Settings**; tautan ulasan Google dikelola di **Link Google Maps**.
 - Perubahan itu **tidak mengubah slug** dan **tidak merusak** link NFC/QR yang sudah ditempel.
 
 Jadi utak-atik Settings aman untuk link fisik — yang berubah hanya isi/perilaku di belakang link, bukan URL-nya sendiri.
@@ -108,7 +97,7 @@ Jadi utak-atik Settings aman untuk link fisik — yang berubah hanya isi/perilak
 ## Ringkas alur harian
 
 1. Admin Nived terbitkan kartu + slug → tulis ke NFC/QR
-2. Client isi **Settings** (Google URL + WhatsApp)
-3. Client pilih **Mode Kartu** sesuai kebutuhan hari itu
-4. (Opsional) buat link **Staff & Meja** untuk tracking
-5. Pantau **Overview** + unduh materi di **Promosi** bila perlu
+2. Client isi **Link Google Maps** untuk tujuan ulasan toko
+3. Lengkapi nama toko, logo, dan WhatsApp di **Settings**
+4. (Opsional) buat link dan QR lewat **Staff & Meja** untuk tracking
+5. Pantau **Overview** serta tindak lanjuti masukan di **Reviews & Feedback**

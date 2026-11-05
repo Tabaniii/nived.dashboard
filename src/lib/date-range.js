@@ -37,3 +37,12 @@ export function resolveDateRange(key, now = new Date()) {
 
   return { key: rangeKey, label: DATE_RANGES[rangeKey], start, end };
 }
+
+/** Monday at midnight on the Jakarta calendar. */
+export function startOfWibWeek(now = new Date()) {
+  const wib = new Date(now.getTime() + WIB_OFFSET_MS);
+  const daysSinceMonday = (wib.getUTCDay() + 6) % 7;
+  wib.setUTCDate(wib.getUTCDate() - daysSinceMonday);
+  wib.setUTCHours(0, 0, 0, 0);
+  return new Date(wib.getTime() - WIB_OFFSET_MS);
+}

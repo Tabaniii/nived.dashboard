@@ -12,7 +12,7 @@ export async function updateSession(request) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, headers) {
           cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value);
           });
@@ -20,6 +20,9 @@ export async function updateSession(request) {
           cookiesToSet.forEach(({ name, value, options }) => {
             supabaseResponse.cookies.set(name, value, options);
           });
+          for (const [name, value] of Object.entries(headers || {})) {
+            supabaseResponse.headers.set(name, value);
+          }
         },
       },
     }
@@ -29,5 +32,11 @@ export async function updateSession(request) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return { supabase, user, supabaseResponse };
+  return {
+    supabase,
+    user,
+    get response() {
+      return supabaseResponse;
+    },
+  };
 }

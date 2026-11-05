@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getLoginError } from '@/lib/auth/login-error';
+import { signInToPortal } from '@/lib/auth/portal';
 
 /**
  * @param {FormData} formData
@@ -16,40 +16,18 @@ export async function loginAction(formData) {
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const result = await signInToPortal(supabase, {
     email,
     password,
+    requestedPath: formData.get('redirect'),
   });
 
-  if (error) {
-    return { error: getLoginError(error).error };
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, merchant_id, is_active, merchants(status)')
-    .eq('id', data.user.id)
-    .maybeSingle();
-
-  if (!profile?.is_active || !['admin', 'client'].includes(profile?.role)) {
-    await supabase.auth.signOut();
-    return { error: 'Akun tidak memiliki akses dashboard. Staf POS harus masuk melalui halaman login POS.' };
-  }
-
-  if (profile.role === 'client') {
-    const status = profile.merchants?.status;
-    if (status === 'suspended') {
-      await supabase.auth.signOut();
-      return { error: 'Akses merchant ditangguhkan. Hubungi Nived.' };
-    }
-    redirect('/dashboard');
-  }
-
-  redirect('/admin');
+  if (result.error) return { error: result.error };
+  redirect(result.redirectTo);
 }
 
 export async function logoutAction() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect('/');
+  redirect('/login');
 }

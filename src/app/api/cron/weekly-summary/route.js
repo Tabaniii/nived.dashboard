@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { timingSafeEqual } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { collectDigestTargets } from '@/lib/alerts';
+import { isAuthorizedCronRequest } from '@/lib/insights/cron-auth';
 import { generateAndStoreSummary } from '@/lib/insights/store';
 import { buildWeeklySummaryMessage } from '@/lib/insights/message';
 import { getNotifyConfig, sendFonnteMessage, sendTelegramMessage } from '@/lib/notify';
@@ -11,14 +11,6 @@ export const instant = false;
 export const maxDuration = 300;
 
 const CONCURRENCY = 4;
-
-function isAuthorized(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const provided = Buffer.from(request.headers.get('authorization') || '');
-  const expected = Buffer.from(`Bearer ${secret}`);
-  return provided.length === expected.length && timingSafeEqual(provided, expected);
-}
 
 async function deliverDigest(message, targets, config) {
   const results = await Promise.all([
@@ -31,13 +23,16 @@ async function deliverDigest(message, targets, config) {
 async function processMerchant(admin, merchant, { config, dashboardUrl }) {
   try {
     const summary = await generateAndStoreSummary(merchant.id);
+    if (!summary) return { merchant_id: merchant.id, skipped: true };
     let delivered = 0;
 
-    if (summary.feedback_count > 0) {
+    if (summary.feedback_count > 0 && (config.fonnteToken || config.telegramBotToken)) {
       const { data: cards, error } = await admin
         .from('cards')
-        .select('*')
+        .select('is_active, alerts_enabled, alert_whatsapp, alert_telegram_chat_id')
         .eq('merchant_id', merchant.id)
+        .eq('is_active', true)
+        .eq('alerts_enabled', true)
         .is('deleted_at', null);
       if (error) throw error;
 
@@ -47,7 +42,7 @@ async function processMerchant(admin, merchant, { config, dashboardUrl }) {
 
     return { merchant_id: merchant.id, source: summary.source, feedback_count: summary.feedback_count, delivered };
   } catch (err) {
-    console.error(`[cron/weekly-summary] Merchant ${merchant.id} failed:`, err);
+    console.error(`[cron/weekly-summary] Merchant ${merchant.id} failed:`, err?.code || err?.name);
     return { merchant_id: merchant.id, error: true };
   }
 }
@@ -56,7 +51,7 @@ async function processMerchant(admin, merchant, { config, dashboardUrl }) {
  * Weekly AI feedback digest. Vercel Cron calls this with `Authorization: Bearer $CRON_SECRET`.
  */
 export async function GET(request) {
-  if (!isAuthorized(request)) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -71,7 +66,7 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 
-  const context = { config: getNotifyConfig(), dashboardUrl: `${getBaseUrl()}/dashboard` };
+  const context = { config: getNotifyConfig(), dashboardUrl: `${getBaseUrl()}/dashboard/reviews-feedback` };
   const results = [];
   const queue = merchants || [];
   for (let index = 0; index < queue.length; index += CONCURRENCY) {

@@ -27,7 +27,8 @@ const { data, error } = await admin.auth.admin.createUser({
   email,
   password,
   email_confirm: true,
-  user_metadata: { role: 'admin', full_name: fullName },
+  user_metadata: { full_name: fullName },
+  app_metadata: { role: 'admin' },
 });
 
 if (error) {
@@ -39,6 +40,7 @@ const { error: profileError } = await admin.from('profiles').upsert({
   id: data.user.id,
   email,
   role: 'admin',
+  dashboard_role: 'superadmin',
   full_name: fullName,
   merchant_id: null,
 });

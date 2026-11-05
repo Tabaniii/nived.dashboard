@@ -1,126 +1,86 @@
 import { NextResponse } from 'next/server';
+import { findPortalProfile, getPortalAccess, getPortalDestination } from '@/lib/auth/portal';
 import { updateSession } from '@/lib/supabase/middleware';
 
-function isPublicPath(pathname) {
-  if (pathname.startsWith('/r/')) return true;
-  if (pathname.startsWith('/api/feedback')) return true;
-  if (pathname.startsWith('/api/telemetry')) return true;
-  if (pathname === '/api/auth/login') return true;
-  if (pathname === '/api/auth/logout') return true;
-  if (pathname.startsWith('/_next')) return true;
-  if (pathname === '/favicon.ico') return true;
-  return false;
+function isRoute(pathname, base) {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+function routeRedirect(request, url) {
+  // Next.js fetch actions need its redirect header; an HTTP redirect replays the POST at login.
+  if (request.method === 'POST' && request.headers.has('next-action')) {
+    return new NextResponse(null, {
+      headers: { 'x-action-redirect': `${url};replace`, 'Cache-Control': 'private, no-store' },
+    });
+  }
+  return NextResponse.redirect(url);
+}
+
+function loginRedirect(request, destination, unauthorized) {
+  const url = new URL('/login', request.url);
+  url.searchParams.set('redirect', destination);
+  if (unauthorized) url.searchParams.set('error', 'unauthorized');
+  return routeRedirect(request, url);
+}
+
+function withSession(response, session) {
+  for (const cookie of session.response.cookies.getAll()) response.cookies.set(cookie);
+  response.headers.set('Cache-Control', 'private, no-store');
+  return response;
 }
 
 export async function proxy(request) {
-  const { pathname } = request.nextUrl;
-
-  if (isPublicPath(pathname)) {
-    return NextResponse.next();
-  }
+  const { pathname, searchParams } = request.nextUrl;
+  const isDashboard = isRoute(pathname, '/dashboard') || isRoute(pathname, '/api/dashboard');
+  const isAdmin = isRoute(pathname, '/admin') || isRoute(pathname, '/api/admin');
+  const isApi = isRoute(pathname, '/api');
+  const isLogin = pathname === '/' || pathname === '/login';
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const supabaseReady = Boolean(url && anon && !url.includes('your-project'));
-
-  if (!supabaseReady) {
-    // Without Supabase, skip session middleware for pages; APIs stay 401/503 safe.
-    if (
-      pathname.startsWith('/api/dashboard') ||
-      pathname.startsWith('/api/admin') ||
-      pathname === '/api/auth/me'
-    ) {
-      return NextResponse.json(
-        { error: 'Supabase is not configured' },
-        { status: 503 }
-      );
-    }
-    if (
-      pathname === '/' ||
-      pathname.startsWith('/dashboard') ||
-      pathname.startsWith('/admin')
-    ) {
-      return NextResponse.next();
-    }
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey || url.includes('your-project')) {
+    if (isLogin) return NextResponse.next();
+    if (isApi) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });
+    return loginRedirect(request, isDashboard ? '/dashboard' : '/admin', false);
   }
 
-  const { supabase, user, supabaseResponse } = await updateSession(request);
+  const session = await updateSession(request);
+  const { supabase, user } = session;
+  const profile = await findPortalProfile(supabase, user);
+  const access = await getPortalAccess(supabase, profile);
+  const hasPortalAccess = access.dashboard || access.admin;
 
-  let role = null;
-  let merchantStatus = null;
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, merchant_id, is_active, merchants(status)')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    role = profile?.is_active ? profile.role : null;
-    merchantStatus = profile?.merchants?.status ?? null;
+  if (isLogin) {
+    if (!hasPortalAccess || searchParams.get('error') === 'unauthorized') return session.response;
+    const destination = getPortalDestination(access, searchParams.get('redirect'));
+    return withSession(routeRedirect(request, new URL(destination, request.url)), session);
   }
 
-  const isAuthPage = pathname === '/';
-  const isDashboard = pathname.startsWith('/dashboard');
-  const isAdmin = pathname.startsWith('/admin');
+  const authorized = isDashboard ? access.dashboard : isAdmin ? access.admin : hasPortalAccess;
+  if (authorized) return session.response;
 
-  const isProtectedApi =
-    pathname.startsWith('/api/dashboard') ||
-    pathname.startsWith('/api/admin') ||
-    pathname === '/api/auth/me';
-
-  if ((!user || !['admin', 'client'].includes(role)) && (isDashboard || isAdmin || isProtectedApi)) {
-    if (isProtectedApi) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/';
-    redirectUrl.searchParams.set('next', pathname);
-    return NextResponse.redirect(redirectUrl);
+  if (isAdmin && access.dashboard) {
+    const response = isApi
+      ? NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      : routeRedirect(request, new URL('/dashboard', request.url));
+    return withSession(response, session);
   }
 
-  if (user && isProtectedApi) {
-    if (pathname.startsWith('/api/admin') && role === 'client') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-  }
-
-  if (user && ['admin', 'client'].includes(role) && isAuthPage) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = role === 'admin' ? '/admin' : '/dashboard';
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  if (user && role === 'client' && isAdmin) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/dashboard';
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  if (user && role === 'admin' && isDashboard) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/admin';
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  if (user && role === 'client' && isDashboard && merchantStatus === 'suspended') {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/';
-    redirectUrl.searchParams.set('error', 'suspended');
-    // Sign-out is handled on the login page when error=suspended
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  return supabaseResponse;
+  if (user) await supabase.auth.signOut({ scope: 'local' });
+  const response = isApi
+    ? NextResponse.json({ error: user ? 'Forbidden' : 'Unauthorized' }, { status: user ? 403 : 401 })
+    : loginRedirect(request, isDashboard ? '/dashboard' : '/admin', Boolean(user));
+  return withSession(response, session);
 }
 
 export const config = {
   matcher: [
     '/',
+    '/login',
     '/dashboard/:path*',
     '/admin/:path*',
     '/api/dashboard/:path*',
     '/api/admin/:path*',
-    '/api/auth/:path*',
+    '/api/auth/me',
   ],
 };

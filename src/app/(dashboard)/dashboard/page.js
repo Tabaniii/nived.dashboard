@@ -1,9 +1,9 @@
-import { Suspense } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { redirect } from 'next/navigation';
 import { Zap, Calendar, Star, ShieldAlert } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import FeedbackBox from './components/FeedbackBox';
-import WeeklySummary, { WeeklySummarySkeleton } from './components/WeeklySummary';
 import { getClientContext, getClientDashboardData } from './queries';
 
 const TrendCharts = dynamic(() => import('./components/TrendCharts'), {
@@ -20,7 +20,9 @@ export const instant = false;
 
 export default async function ClientDashboardPage() {
   const ctx = await getClientContext();
-  const data = await getClientDashboardData(ctx.profile.merchant_id);
+  if (!ctx) redirect('/login');
+  if (!ctx.merchant) return null;
+  const data = await getClientDashboardData(ctx.merchant.id);
 
   return (
     <div className="space-y-8">
@@ -38,35 +40,34 @@ export default async function ClientDashboardPage() {
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Ringkasan Kinerja">
-        <StatCard label="Taps Hari Ini" value={data.kpi.tapsToday} icon={Zap} hint="Aktivitas tap & scan hari ini" />
-        <StatCard label="Taps Bulan Ini" value={data.kpi.tapsMonth} icon={Calendar} hint="Akumulasi kunjungan bulan ini" />
+        <StatCard label="Penjualan Hari Ini" value={new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(data.kpi.salesToday)} icon={Zap} hint="Pembayaran POS berhasil · WIB" />
+        <StatCard label="Pesanan Meja Aktif" value={data.kpi.activeTableOrders} icon={Calendar} hint="Pesanan meja yang belum selesai" />
         <StatCard
-          label="Ulasan Positif (4–5★)"
-          value={data.kpi.positiveReviews}
+          label="Google Review Taps"
+          value={data.kpi.reviewClicks}
           icon={Star}
-          hint="Rating positif dari halaman slug"
-          badge="Internal"
+          hint="Klik tautan Google Maps · 7 hari terakhir"
+          badge="7 Hari"
         />
         <StatCard
-          label="Keluhan Terlindungi (1–3★)"
-          value={data.kpi.shieldedComplaints}
+          label="Masukan Pribadi"
+          value={data.kpi.privateFeedbacks}
           icon={ShieldAlert}
-          hint="Ditahan di kotak masukan internal"
-          badge="Shielded"
+          hint="Masukan yang diterima manajemen"
+          badge="Semua Waktu"
         />
       </section>
 
-      <Suspense fallback={<WeeklySummarySkeleton />}>
-        <WeeklySummary merchantId={ctx.profile.merchant_id} />
-      </Suspense>
+      <Link href="/dashboard/reviews-feedback" className="inline-flex min-h-11 items-center font-semibold text-brand-700 underline dark:text-brand-400">Reputation &amp; Feedback Hub</Link>
 
       <TrendCharts
+        storeId={ctx.merchant.id}
         initialDaily={data.daily}
         initialWeekly={data.weekly}
         initialPeakHours={data.peakHours}
       />
 
-      <FeedbackBox feedbacks={data.feedbacks} />
+      <FeedbackBox feedbacks={data.feedbacks} businessName={ctx.merchant.business_name} />
     </div>
   );
 }

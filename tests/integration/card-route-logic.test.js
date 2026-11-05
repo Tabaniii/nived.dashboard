@@ -3,7 +3,7 @@ import { getCardBySlug, resetMockStore, getMockStore } from '@/lib/db';
 import { handleTapTelemetry } from '@/lib/logger';
 import { resetDebounceCache } from '@/lib/debounce';
 
-describe('Card Route Logic & Shield Mode vs Direct Mode', () => {
+describe('Table tap card lookup and telemetry', () => {
   beforeEach(() => {
     resetMockStore();
     resetDebounceCache();
@@ -67,14 +67,12 @@ describe('Card Route Logic & Shield Mode vs Direct Mode', () => {
     expect(second).toBe(false); // Suppressed by debounce
   });
 
-  it('resolves direct_redirect for Direct Mode cards and fallback for missing cards', async () => {
+  it('shows both choices for legacy card configurations and falls back for missing cards', async () => {
     const directCard = await getCardBySlug('direct-card');
     const { resolveCardAction } = await import('@/lib/resolve-card-action');
-    const action = resolveCardAction(directCard);
-
-    expect(action.type).toBe('direct_redirect');
-    expect(action.status).toBe(307);
-    expect(action.url).toBe(directCard.google_review_url);
+    const shieldCard = await getCardBySlug('demo-card');
+    expect(resolveCardAction(directCard)).toEqual({ type: 'choice', mode: 'review' });
+    expect(resolveCardAction(shieldCard)).toEqual({ type: 'choice', mode: 'review' });
 
     const missingCard = await getCardBySlug('nonexistent-slug');
     expect(resolveCardAction(missingCard)).toEqual({ type: 'fallback' });
